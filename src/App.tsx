@@ -71,7 +71,8 @@ function handleFirestoreError(error: unknown, operationType: OperationType, path
 // --- Components ---
 
 const isAdmin = (user: User | null) => {
-  return user?.email === "tyouing1563@gmail.com";
+  if (!user?.email) return false;
+  return user.email.toLowerCase().trim() === "tyouing1563@gmail.com";
 };
 
 const ErrorDisplay = ({ errorInfo, onReset }: { errorInfo: string; onReset: () => void }) => {
@@ -760,24 +761,51 @@ const AdminDashboard = ({ config, products, user }: { config: SiteConfig; produc
           {user && !isAdmin(user) && (
             <div className="mb-8 p-4 bg-red-50 border border-red-100 rounded-2xl text-red-600 text-sm font-medium">
               <p className="mb-1">권한이 없는 계정입니다:</p>
-              <p className="font-bold">{user.email}</p>
+              <p className="font-bold break-all">{user.email}</p>
               <p className="mt-2 text-xs opacity-70">관리자 계정(tyouing1563@gmail.com)으로 다시 로그인해 주세요.</p>
+              <button 
+                onClick={() => signOut(auth)}
+                className="mt-4 text-xs underline hover:text-red-800"
+              >
+                로그아웃 후 다시 시도
+              </button>
             </div>
           )}
 
-          <button
-            onClick={() => {
-              signInWithPopup(auth, new GoogleAuthProvider())
-                .catch(error => {
-                  console.error("Login Error:", error);
-                  alert(`로그인 중 오류가 발생했습니다: ${error.message}\n\n브라우저의 팝업 차단 설정을 확인해 주세요.`);
-                });
-            }}
-            className="w-full py-4 bg-blue-900 text-white font-bold rounded-2xl hover:bg-blue-800 transition-all shadow-lg shadow-blue-900/20 flex items-center justify-center gap-3"
-          >
-            <img src="https://www.google.com/favicon.ico" className="w-5 h-5" alt="Google" />
-            {user ? '다른 계정으로 로그인' : 'Google로 로그인'}
-          </button>
+          <div className="space-y-3">
+            <button
+              onClick={() => {
+                const provider = new GoogleAuthProvider();
+                // Force account selection to help user pick the right one
+                provider.setCustomParameters({ prompt: 'select_account' });
+                
+                signInWithPopup(auth, provider)
+                  .catch(error => {
+                    console.error("Login Error:", error);
+                    let errorMsg = error.message;
+                    if (error.code === 'auth/unauthorized-domain') {
+                      errorMsg = "현재 도메인이 Firebase 승인 도메인 목록에 없습니다. 관리자에게 문의하세요.";
+                    } else if (error.code === 'auth/popup-blocked') {
+                      errorMsg = "브라우저에서 팝업이 차단되었습니다. 팝업 차단을 해제하고 다시 시도해 주세요.";
+                    }
+                    alert(`로그인 중 오류가 발생했습니다 (${error.code}):\n${errorMsg}`);
+                  });
+              }}
+              className="w-full py-4 bg-blue-900 text-white font-bold rounded-2xl hover:bg-blue-800 transition-all shadow-lg shadow-blue-900/20 flex items-center justify-center gap-3"
+            >
+              <img src="https://www.google.com/favicon.ico" className="w-5 h-5" alt="Google" />
+              {user ? '다른 계정으로 로그인' : 'Google로 로그인'}
+            </button>
+            
+            {user && (
+              <button
+                onClick={() => signOut(auth)}
+                className="w-full py-3 text-gray-500 text-sm font-medium hover:text-gray-700 transition-colors"
+              >
+                로그아웃
+              </button>
+            )}
+          </div>
         </div>
       </div>
     );
