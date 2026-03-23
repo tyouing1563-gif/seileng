@@ -18,6 +18,7 @@ export interface Product {
   category: string;
   description: string;
   imageUrl: string;
+  gallery?: string[];
   features: string[];
 }
 

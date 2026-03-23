@@ -2,10 +2,10 @@ import * as React from 'react';
 import { useEffect, useState, useCallback, Component, ReactNode } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useLocation, useSearchParams } from 'react-router-dom';
 import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut, User } from 'firebase/auth';
-import { doc, onSnapshot, collection, query, orderBy, getDoc, setDoc, getDocFromServer } from 'firebase/firestore';
+import { doc, onSnapshot, collection, query, orderBy, getDoc, setDoc, getDocFromServer, deleteDoc } from 'firebase/firestore';
 import { auth, db } from './firebase';
-import { SiteConfig, Product, UserProfile } from './types';
-import { Menu, X, Settings, LogOut, Phone, Mail, MapPin, ChevronRight, ChevronDown, Factory, Utensils, ShieldCheck, Clock, AlertCircle, Quote } from 'lucide-react';
+import { SiteConfig, Product, UserProfile, Inquiry } from './types';
+import { Menu, X, Settings, LogOut, Phone, Mail, MapPin, ChevronRight, ChevronDown, Factory, Utensils, ShieldCheck, Clock, AlertCircle, Quote, Camera, Upload, Image } from 'lucide-react';
 import { motion, AnimatePresence, useScroll, useTransform } from 'motion/react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -120,6 +120,7 @@ const Navbar = ({ config, user }: { config: SiteConfig; user: User | null }) => 
       ]
     },
     { name: '고객지원', path: '/contact' },
+    { name: '관리자', path: '/admin' },
   ];
 
   const [activeSubMenu, setActiveSubMenu] = useState<string | null>(null);
@@ -154,7 +155,7 @@ const Navbar = ({ config, user }: { config: SiteConfig; user: User | null }) => 
                   to={link.path}
                   className={cn(
                     "text-sm font-medium transition-colors hover:text-blue-900 flex items-center gap-1 py-8",
-                    location.pathname === link.path ? "text-blue-900" : "text-gray-600"
+                    location.pathname === link.path ? "text-blue-900" : (link.name === '관리자' ? "text-gray-400" : "text-gray-600")
                   )}
                 >
                   {link.name}
@@ -178,11 +179,6 @@ const Navbar = ({ config, user }: { config: SiteConfig; user: User | null }) => 
                 )}
               </div>
             ))}
-            {user && (
-              <Link to="/admin" className="p-2 text-gray-500 hover:text-blue-900 transition-colors">
-                <Settings className="w-5 h-5" />
-              </Link>
-            )}
           </div>
 
           {/* Mobile Menu Toggle */}
@@ -212,7 +208,7 @@ const Navbar = ({ config, user }: { config: SiteConfig; user: User | null }) => 
                       onClick={() => !link.subLinks && setIsOpen(false)}
                       className={cn(
                         "block px-3 py-4 text-base font-medium",
-                        location.pathname === link.path ? "text-blue-900" : "text-gray-600"
+                        location.pathname === link.path ? "text-blue-900" : (link.name === '관리자' ? "text-gray-400" : "text-gray-600")
                       )}
                     >
                       {link.name}
@@ -242,15 +238,6 @@ const Navbar = ({ config, user }: { config: SiteConfig; user: User | null }) => 
                   )}
                 </div>
               ))}
-              {user && (
-                <Link
-                  to="/admin"
-                  onClick={() => setIsOpen(false)}
-                  className="block px-3 py-4 text-base font-medium text-blue-900 hover:bg-gray-50 rounded-md"
-                >
-                  관리자 설정
-                </Link>
-              )}
             </div>
           </motion.div>
         )}
@@ -553,13 +540,21 @@ const ProductsPage = ({ products }: { products: Product[] }) => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {filteredProducts.map((product) => (
             <div key={product.id} className="bg-white rounded-2xl overflow-hidden border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
-              <div className="aspect-video bg-gray-100 overflow-hidden">
+              <div className="aspect-video bg-gray-100 overflow-hidden relative group">
                 <img
                   src={product.imageUrl}
                   alt={product.name}
-                  className="w-full h-full object-cover"
+                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
                   referrerPolicy="no-referrer"
                 />
+                {product.gallery && product.gallery.length > 0 && (
+                  <div className="absolute bottom-4 right-4 flex gap-1">
+                    {product.gallery.slice(0, 3).map((_, i) => (
+                      <div key={i} className="w-1.5 h-1.5 bg-white/80 rounded-full shadow-sm" />
+                    ))}
+                    {product.gallery.length > 3 && <div className="text-[8px] text-white font-bold">+{product.gallery.length - 3}</div>}
+                  </div>
+                )}
               </div>
               <div className="p-8">
                 <span className="text-xs font-bold text-blue-900 uppercase tracking-wider mb-2 block">
@@ -752,17 +747,20 @@ const ContactPage = ({ config }: { config: SiteConfig }) => {
 const AdminDashboard = ({ config, products, user }: { config: SiteConfig; products: Product[]; user: User | null }) => {
   const [activeTab, setActiveTab] = useState<'config' | 'products' | 'inquiries'>('config');
 
-  if (!user) {
+  if (!user || !isAdmin(user)) {
     return (
-      <div className="pt-40 pb-24 flex items-center justify-center">
-        <div className="text-center max-w-sm">
-          <Settings className="w-16 h-16 text-gray-300 mx-auto mb-6" />
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">관리자 전용 페이지</h2>
-          <p className="text-gray-600 mb-8">이 페이지에 접근하려면 관리자 계정으로 로그인해야 합니다.</p>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4 pt-40">
+        <div className="max-w-md w-full bg-white p-10 rounded-[2.5rem] shadow-2xl border border-gray-100 text-center">
+          <div className="w-20 h-20 bg-blue-50 rounded-3xl flex items-center justify-center mx-auto mb-8">
+            <ShieldCheck className="w-10 h-10 text-blue-900" />
+          </div>
+          <h2 className="text-3xl font-bold text-gray-900 mb-4">관리자 전용 페이지</h2>
+          <p className="text-gray-600 mb-10 leading-relaxed">이 페이지에 접근하려면 관리자 계정으로 로그인해야 합니다.</p>
           <button
             onClick={() => signInWithPopup(auth, new GoogleAuthProvider())}
-            className="w-full py-3 bg-blue-900 text-white font-bold rounded-xl"
+            className="w-full py-4 bg-blue-900 text-white font-bold rounded-2xl hover:bg-blue-800 transition-all shadow-lg shadow-blue-900/20 flex items-center justify-center gap-3"
           >
+            <img src="https://www.google.com/favicon.ico" className="w-5 h-5" alt="Google" />
             Google로 로그인
           </button>
         </div>
@@ -771,261 +769,480 @@ const AdminDashboard = ({ config, products, user }: { config: SiteConfig; produc
   }
 
   return (
-    <div className="pt-32 pb-24 min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center mb-12">
-          <h1 className="text-3xl font-bold text-gray-900">관리자 대시보드</h1>
-          <button onClick={() => signOut(auth)} className="flex items-center text-gray-500 hover:text-red-600">
-            <LogOut className="w-4 h-4 mr-2" /> 로그아웃
-          </button>
+    <div className="pt-20 min-h-screen bg-gray-50 flex flex-col md:flex-row">
+      {/* Sidebar */}
+      <aside className="w-full md:w-72 bg-white border-r border-gray-200 p-8 flex flex-col">
+        <div className="mb-12">
+          <h1 className="text-2xl font-black text-blue-900 tracking-tighter mb-2">ADMIN</h1>
+          <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">Control Panel</p>
         </div>
 
-        <div className="flex space-x-4 mb-8">
+        <nav className="space-y-2 flex-grow">
           {[
-            { id: 'config', name: '사이트 설정' },
-            { id: 'products', name: '제품 관리' },
-            { id: 'inquiries', name: '문의 내역' },
+            { id: 'config', name: '사이트 설정', icon: Settings },
+            { id: 'products', name: '제품 관리', icon: Factory },
+            { id: 'inquiries', name: '문의 내역', icon: Mail },
           ].map(tab => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as any)}
               className={cn(
-                "px-6 py-2 rounded-lg font-bold transition-all",
-                activeTab === tab.id ? "bg-blue-900 text-white" : "bg-white text-gray-600 border border-gray-200"
+                "w-full flex items-center gap-4 px-6 py-4 rounded-2xl font-bold transition-all text-left",
+                activeTab === tab.id 
+                  ? "bg-blue-900 text-white shadow-lg shadow-blue-900/20" 
+                  : "text-gray-500 hover:bg-gray-50"
               )}
             >
+              <tab.icon className="w-5 h-5" />
               {tab.name}
             </button>
           ))}
-        </div>
+        </nav>
 
-        <div className="bg-white rounded-3xl p-8 border border-gray-200 shadow-sm">
-          {activeTab === 'config' && <ConfigEditor config={config} />}
-          {activeTab === 'products' && <ProductManager products={products} />}
-          {activeTab === 'inquiries' && <InquiryViewer />}
+        <div className="mt-auto pt-8 border-t border-gray-100">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-900 font-bold">
+              {user.email?.[0].toUpperCase()}
+            </div>
+            <div className="overflow-hidden">
+              <p className="text-sm font-bold text-gray-900 truncate">{user.email}</p>
+              <p className="text-xs text-gray-400">Administrator</p>
+            </div>
+          </div>
+          <button 
+            onClick={() => signOut(auth)} 
+            className="w-full flex items-center justify-center gap-2 py-3 border border-gray-200 text-gray-500 font-bold rounded-xl hover:bg-red-50 hover:text-red-600 hover:border-red-100 transition-all"
+          >
+            <LogOut className="w-4 h-4" /> 로그아웃
+          </button>
         </div>
-      </div>
+      </aside>
+
+      {/* Main Content */}
+      <main className="flex-grow p-8 md:p-12 overflow-y-auto max-h-screen">
+        <div className="max-w-5xl mx-auto pb-20">
+          <div className="mb-12">
+            <h2 className="text-3xl font-bold text-gray-900 mb-2">
+              {activeTab === 'config' && '사이트 설정'}
+              {activeTab === 'products' && '제품 관리'}
+              {activeTab === 'inquiries' && '문의 내역'}
+            </h2>
+            <p className="text-gray-500">웹사이트의 {activeTab === 'config' ? '기본 정보와 디자인' : activeTab === 'products' ? '제품 라인업' : '고객 문의'}을 관리합니다.</p>
+          </div>
+
+          <div className="bg-white rounded-[2.5rem] p-10 shadow-sm border border-gray-100">
+            {activeTab === 'config' && <ConfigEditor config={config} />}
+            {activeTab === 'products' && <ProductManager products={products} />}
+            {activeTab === 'inquiries' && <InquiryViewer />}
+          </div>
+        </div>
+      </main>
     </div>
   );
 };
 
 const ConfigEditor = ({ config }: { config: SiteConfig }) => {
   const [localConfig, setLocalConfig] = useState(config);
+  const [isSaving, setIsSaving] = useState(false);
 
   const handleSave = async () => {
+    setIsSaving(true);
     try {
       await setDoc(doc(db, 'config', 'main'), localConfig);
       alert('설정이 저장되었습니다.');
     } catch (error) {
       console.error(error);
       alert('권한이 없거나 오류가 발생했습니다.');
+    } finally {
+      setIsSaving(false);
     }
   };
 
-  return (
-    <div className="space-y-6 max-w-2xl">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div>
-          <label className="block text-sm font-bold text-gray-700 mb-2">회사명</label>
-          <input
-            type="text"
-            value={localConfig.siteName}
-            onChange={e => setLocalConfig({ ...localConfig, siteName: e.target.value })}
-            className="w-full px-4 py-2 rounded-lg border border-gray-200"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-bold text-gray-700 mb-2">대표 이메일</label>
-          <input
-            type="text"
-            value={localConfig.contactEmail}
-            onChange={e => setLocalConfig({ ...localConfig, contactEmail: e.target.value })}
-            className="w-full px-4 py-2 rounded-lg border border-gray-200"
-          />
-        </div>
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div>
-          <label className="block text-sm font-bold text-gray-700 mb-2">연락처</label>
-          <input
-            type="text"
-            value={localConfig.contactPhone}
-            onChange={e => setLocalConfig({ ...localConfig, contactPhone: e.target.value })}
-            className="w-full px-4 py-2 rounded-lg border border-gray-200"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-bold text-gray-700 mb-2">팩스번호</label>
-          <input
-            type="text"
-            value={localConfig.fax || ''}
-            onChange={e => setLocalConfig({ ...localConfig, fax: e.target.value })}
-            className="w-full px-4 py-2 rounded-lg border border-gray-200"
-          />
-        </div>
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div>
-          <label className="block text-sm font-bold text-gray-700 mb-2">대표자</label>
-          <input
-            type="text"
-            value={localConfig.representative || ''}
-            onChange={e => setLocalConfig({ ...localConfig, representative: e.target.value })}
-            className="w-full px-4 py-2 rounded-lg border border-gray-200"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-bold text-gray-700 mb-2">주소</label>
-          <input
-            type="text"
-            value={localConfig.address}
-            onChange={e => setLocalConfig({ ...localConfig, address: e.target.value })}
-            className="w-full px-4 py-2 rounded-lg border border-gray-200"
-          />
-        </div>
-      </div>
-      <div>
-        <label className="block text-sm font-bold text-gray-700 mb-2">메인 타이틀</label>
-        <input
-          type="text"
-          value={localConfig.heroTitle}
-          onChange={e => setLocalConfig({ ...localConfig, heroTitle: e.target.value })}
-          className="w-full px-4 py-2 rounded-lg border border-gray-200"
-        />
-      </div>
-      <div>
-        <label className="block text-sm font-bold text-gray-700 mb-2">메인 서브타이틀</label>
+  const InputField = ({ label, value, onChange, type = "text", textarea = false }: any) => (
+    <div className="space-y-2">
+      <label className="text-sm font-bold text-gray-700 uppercase tracking-wider">{label}</label>
+      {textarea ? (
         <textarea
-          rows={3}
-          value={localConfig.heroSubtitle}
-          onChange={e => setLocalConfig({ ...localConfig, heroSubtitle: e.target.value })}
-          className="w-full px-4 py-2 rounded-lg border border-gray-200"
+          rows={4}
+          value={value}
+          onChange={e => onChange(e.target.value)}
+          className="w-full px-5 py-3 rounded-2xl border border-gray-200 focus:ring-2 focus:ring-blue-900/10 focus:border-blue-900 outline-none transition-all"
         />
+      ) : (
+        <input
+          type={type}
+          value={value}
+          onChange={e => onChange(e.target.value)}
+          className="w-full px-5 py-3 rounded-2xl border border-gray-200 focus:ring-2 focus:ring-blue-900/10 focus:border-blue-900 outline-none transition-all"
+        />
+      )}
+    </div>
+  );
+
+  return (
+    <div className="space-y-10">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <div className="space-y-6">
+          <h3 className="text-lg font-bold text-gray-900 border-l-4 border-blue-900 pl-4">기본 정보</h3>
+          <InputField label="회사명" value={localConfig.siteName} onChange={(v: string) => setLocalConfig({ ...localConfig, siteName: v })} />
+          <InputField label="대표자" value={localConfig.representative || ''} onChange={(v: string) => setLocalConfig({ ...localConfig, representative: v })} />
+          <InputField label="주소" value={localConfig.address} onChange={(v: string) => setLocalConfig({ ...localConfig, address: v })} />
+        </div>
+        <div className="space-y-6">
+          <h3 className="text-lg font-bold text-gray-900 border-l-4 border-blue-900 pl-4">연락처 정보</h3>
+          <InputField label="대표 이메일" value={localConfig.contactEmail} onChange={(v: string) => setLocalConfig({ ...localConfig, contactEmail: v })} />
+          <InputField label="연락처" value={localConfig.contactPhone} onChange={(v: string) => setLocalConfig({ ...localConfig, contactPhone: v })} />
+          <InputField label="팩스번호" value={localConfig.fax || ''} onChange={(v: string) => setLocalConfig({ ...localConfig, fax: v })} />
+        </div>
       </div>
-      <button
-        onClick={handleSave}
-        className="px-8 py-3 bg-blue-900 text-white font-bold rounded-xl"
-      >
-        변경사항 저장
-      </button>
+
+      <div className="space-y-6">
+        <h3 className="text-lg font-bold text-gray-900 border-l-4 border-blue-900 pl-4">메인 화면 문구</h3>
+        <InputField label="메인 타이틀" value={localConfig.heroTitle} onChange={(v: string) => setLocalConfig({ ...localConfig, heroTitle: v })} />
+        <InputField label="메인 서브타이틀" textarea value={localConfig.heroSubtitle} onChange={(v: string) => setLocalConfig({ ...localConfig, heroSubtitle: v })} />
+      </div>
+
+      <div className="pt-8 border-t border-gray-100">
+        <button
+          onClick={handleSave}
+          disabled={isSaving}
+          className="px-10 py-4 bg-blue-900 text-white font-bold rounded-2xl hover:bg-blue-800 transition-all shadow-lg shadow-blue-900/20 disabled:opacity-50"
+        >
+          {isSaving ? '저장 중...' : '변경사항 저장하기'}
+        </button>
+      </div>
     </div>
   );
 };
 
 const ProductManager = ({ products }: { products: Product[] }) => {
   const [editing, setEditing] = useState<Partial<Product> | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'main' | 'gallery') => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Limit file size to ~500KB for Base64 storage in Firestore
+    if (file.size > 512 * 1024) {
+      alert('이미지 크기가 너무 큽니다. 500KB 이하의 이미지를 사용해 주세요.');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const base64String = reader.result as string;
+      if (type === 'main') {
+        setEditing(prev => ({ ...prev, imageUrl: base64String }));
+      } else {
+        setEditing(prev => ({
+          ...prev,
+          gallery: [...(prev?.gallery || []), base64String]
+        }));
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const removeGalleryImage = (index: number) => {
+    setEditing(prev => ({
+      ...prev,
+      gallery: prev?.gallery?.filter((_, i) => i !== index)
+    }));
+  };
 
   const handleSave = async () => {
-    if (!editing?.name) return;
+    if (!editing?.name || !editing?.category) {
+      alert('제품명과 카테고리는 필수입니다.');
+      return;
+    }
+    setIsSaving(true);
     try {
       const id = editing.id || doc(collection(db, 'products')).id;
-      await setDoc(doc(db, 'products', id), { ...editing, id });
+      const productData = {
+        ...editing,
+        id,
+        features: editing.features || [],
+        gallery: editing.gallery || []
+      };
+      await setDoc(doc(db, 'products', id), productData);
       setEditing(null);
-      alert('제품이 저장되었습니다.');
+      alert('제품 정보가 저장되었습니다.');
     } catch (error) {
       console.error(error);
+      alert('저장 중 오류가 발생했습니다.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!window.confirm('정말로 이 제품을 삭제하시겠습니까?')) return;
+    try {
+      await deleteDoc(doc(db, 'products', id));
+      alert('제품이 삭제되었습니다.');
+    } catch (error) {
+      console.error(error);
+      alert('삭제 중 오류가 발생했습니다.');
     }
   };
 
   return (
-    <div>
-      <div className="flex justify-between items-center mb-8">
-        <h3 className="text-xl font-bold">제품 목록 ({products.length})</h3>
+    <div className="space-y-8">
+      <div className="flex justify-between items-center">
+        <h3 className="text-xl font-bold text-gray-900">제품 목록 ({products.length})</h3>
         <button
-          onClick={() => setEditing({ name: '', category: '터널형 오븐', description: '', imageUrl: '', features: [] })}
-          className="px-4 py-2 bg-blue-900 text-white rounded-lg text-sm font-bold"
+          onClick={() => setEditing({ name: '', category: 'STEEL BAND OVEN', description: '', imageUrl: '', gallery: [], features: [] })}
+          className="px-6 py-3 bg-blue-900 text-white rounded-2xl text-sm font-bold hover:bg-blue-800 transition-all flex items-center gap-2"
         >
-          + 새 제품 추가
+          <Settings className="w-4 h-4" /> 새 제품 추가
         </button>
       </div>
 
-      {editing && (
-        <div className="mb-12 p-6 bg-gray-50 rounded-2xl border border-gray-200 space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <input
-              placeholder="제품명"
-              value={editing.name}
-              onChange={e => setEditing({ ...editing, name: e.target.value })}
-              className="px-4 py-2 rounded-lg border border-gray-200"
-            />
-            <input
-              placeholder="카테고리"
-              value={editing.category}
-              onChange={e => setEditing({ ...editing, category: e.target.value })}
-              className="px-4 py-2 rounded-lg border border-gray-200"
-            />
-          </div>
-          <input
-            placeholder="이미지 URL"
-            value={editing.imageUrl}
-            onChange={e => setEditing({ ...editing, imageUrl: e.target.value })}
-            className="w-full px-4 py-2 rounded-lg border border-gray-200"
-          />
-          <textarea
-            placeholder="설명"
-            value={editing.description}
-            onChange={e => setEditing({ ...editing, description: e.target.value })}
-            className="w-full px-4 py-2 rounded-lg border border-gray-200"
-          />
-          <div className="flex space-x-2">
-            <button onClick={handleSave} className="px-6 py-2 bg-blue-900 text-white rounded-lg font-bold">저장</button>
-            <button onClick={() => setEditing(null)} className="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg font-bold">취소</button>
-          </div>
-        </div>
-      )}
+      <AnimatePresence>
+        {editing && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="overflow-hidden"
+          >
+            <div className="p-8 bg-gray-50 rounded-[2rem] border border-gray-200 space-y-6 mb-8">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="space-y-6">
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-gray-500 uppercase tracking-widest">제품명</label>
+                    <input
+                      placeholder="제품명을 입력하세요"
+                      value={editing.name}
+                      onChange={e => setEditing({ ...editing, name: e.target.value })}
+                      className="w-full px-5 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-900/10 outline-none"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-gray-500 uppercase tracking-widest">카테고리</label>
+                    <select
+                      value={editing.category}
+                      onChange={e => setEditing({ ...editing, category: e.target.value })}
+                      className="w-full px-5 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-900/10 outline-none"
+                    >
+                      <option value="STEEL BAND OVEN">STEEL BAND OVEN</option>
+                      <option value="벨트컨베이어">벨트컨베이어</option>
+                      <option value="샌딩머신">샌딩머신</option>
+                      <option value="오일스프레이, 소금스프레이">오일스프레이, 소금스프레이</option>
+                      <option value="기타">기타</option>
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-gray-500 uppercase tracking-widest">제품 설명</label>
+                    <textarea
+                      placeholder="제품에 대한 상세 설명을 입력하세요"
+                      rows={4}
+                      value={editing.description}
+                      onChange={e => setEditing({ ...editing, description: e.target.value })}
+                      className="w-full px-5 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-900/10 outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-6">
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-gray-500 uppercase tracking-widest">대표 이미지 (Main Photo)</label>
+                    <div className="flex items-start gap-4">
+                      <div className="w-32 h-32 rounded-2xl bg-white border border-gray-200 overflow-hidden flex items-center justify-center relative group">
+                        {editing.imageUrl ? (
+                          <img src={editing.imageUrl} className="w-full h-full object-cover" alt="Preview" />
+                        ) : (
+                          <Camera className="w-8 h-8 text-gray-300" />
+                        )}
+                        <label className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer">
+                          <Upload className="w-6 h-6 text-white" />
+                          <input type="file" accept="image/*" className="hidden" onChange={e => handleImageUpload(e, 'main')} />
+                        </label>
+                      </div>
+                      <div className="flex-grow space-y-2">
+                        <input
+                          placeholder="이미지 URL 직접 입력"
+                          value={editing.imageUrl}
+                          onChange={e => setEditing({ ...editing, imageUrl: e.target.value })}
+                          className="w-full px-4 py-2 text-sm rounded-lg border border-gray-200 focus:ring-2 focus:ring-blue-900/10 outline-none"
+                        />
+                        <p className="text-[10px] text-gray-400">직접 업로드하거나 이미지 주소를 입력하세요.</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-gray-500 uppercase tracking-widest">제품 갤러리 (Additional Photos)</label>
+                    <div className="grid grid-cols-4 gap-2">
+                      {editing.gallery?.map((img, idx) => (
+                        <div key={idx} className="aspect-square rounded-lg bg-white border border-gray-200 overflow-hidden relative group">
+                          <img src={img} className="w-full h-full object-cover" alt={`Gallery ${idx}`} />
+                          <button 
+                            onClick={() => removeGalleryImage(idx)}
+                            className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ))}
+                      <label className="aspect-square rounded-lg bg-white border-2 border-dashed border-gray-200 flex flex-col items-center justify-center cursor-pointer hover:bg-gray-100 transition-colors">
+                        <Camera className="w-5 h-5 text-gray-400 mb-1" />
+                        <span className="text-[10px] text-gray-400 font-bold">추가</span>
+                        <input type="file" accept="image/*" className="hidden" onChange={e => handleImageUpload(e, 'gallery')} />
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-4 pt-4 border-t border-gray-200">
+                <button 
+                  onClick={handleSave} 
+                  disabled={isSaving}
+                  className="px-8 py-3 bg-blue-900 text-white rounded-xl font-bold hover:bg-blue-800 transition-all disabled:opacity-50"
+                >
+                  {isSaving ? '저장 중...' : '저장하기'}
+                </button>
+                <button 
+                  onClick={() => setEditing(null)} 
+                  className="px-8 py-3 bg-white border border-gray-200 text-gray-600 rounded-xl font-bold hover:bg-gray-50 transition-all"
+                >
+                  취소
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <div className="grid grid-cols-1 gap-4">
         {products.map(p => (
-          <div key={p.id} className="flex items-center justify-between p-4 border border-gray-100 rounded-xl hover:bg-gray-50">
-            <div className="flex items-center space-x-4">
-              <img src={p.imageUrl} className="w-12 h-12 rounded object-cover" referrerPolicy="no-referrer" />
+          <div key={p.id} className="flex items-center justify-between p-6 border border-gray-100 rounded-3xl hover:bg-gray-50 transition-all group">
+            <div className="flex items-center space-x-6">
+              <div className="w-20 h-20 rounded-2xl overflow-hidden bg-gray-100 shadow-inner relative group/img">
+                {p.imageUrl ? (
+                  <img src={p.imageUrl} className="w-full h-full object-cover" referrerPolicy="no-referrer" alt={p.name} />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-gray-300">
+                    <Camera className="w-8 h-8" />
+                  </div>
+                )}
+                <div className="absolute inset-0 bg-blue-900/60 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center">
+                  <button onClick={() => setEditing(p)} className="text-white text-[10px] font-bold">사진 관리</button>
+                </div>
+              </div>
               <div>
-                <div className="font-bold text-gray-900">{p.name}</div>
-                <div className="text-xs text-gray-500">{p.category}</div>
+                <div className="font-bold text-gray-900 text-lg">{p.name}</div>
+                <div className="flex items-center gap-3">
+                  <div className="text-xs font-bold text-blue-900 uppercase tracking-widest">{p.category}</div>
+                  <div className="flex items-center gap-1 text-[10px] text-gray-400">
+                    <Image className="w-3 h-3" />
+                    <span>{1 + (p.gallery?.length || 0)} Photos</span>
+                  </div>
+                </div>
               </div>
             </div>
-            <button onClick={() => setEditing(p)} className="text-blue-900 font-bold text-sm">수정</button>
+            <div className="flex items-center gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
+              <button 
+                onClick={() => setEditing(p)} 
+                className="p-3 text-blue-900 hover:bg-blue-50 rounded-xl transition-all"
+                title="수정"
+              >
+                <Settings className="w-5 h-5" />
+              </button>
+              <button 
+                onClick={() => handleDelete(p.id)} 
+                className="p-3 text-red-500 hover:bg-red-50 rounded-xl transition-all"
+                title="삭제"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
           </div>
         ))}
+        {products.length === 0 && (
+          <div className="text-center py-20 bg-gray-50 rounded-[2.5rem] border-2 border-dashed border-gray-200">
+            <p className="text-gray-400 font-medium">등록된 제품이 없습니다.</p>
+          </div>
+        )}
       </div>
     </div>
   );
 };
 
 const InquiryViewer = () => {
-  const [inquiries, setInquiries] = useState<any[]>([]);
+  const [inquiries, setInquiries] = useState<Inquiry[]>([]);
 
   useEffect(() => {
     if (!isAdmin(auth.currentUser)) return;
     const q = query(collection(db, 'inquiries'), orderBy('createdAt', 'desc'));
     return onSnapshot(q, (snapshot) => {
-      setInquiries(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      setInquiries(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Inquiry)));
     }, (error) => handleFirestoreError(error, OperationType.GET, 'inquiries'));
   }, []);
 
+  const handleDelete = async (id: string) => {
+    if (!window.confirm('이 문의 내역을 삭제하시겠습니까?')) return;
+    try {
+      await deleteDoc(doc(db, 'inquiries', id));
+      alert('삭제되었습니다.');
+    } catch (error) {
+      console.error(error);
+      alert('삭제 중 오류가 발생했습니다.');
+    }
+  };
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       {inquiries.map(inq => (
-        <div key={inq.id} className="p-6 border border-gray-100 rounded-2xl hover:bg-gray-50 transition-colors">
-          <div className="flex justify-between items-start mb-4">
-            <div>
-              <span className="text-xs font-bold text-blue-900 bg-blue-50 px-2 py-1 rounded mb-2 inline-block">
-                {new Date(inq.createdAt).toLocaleDateString()}
-              </span>
-              <h4 className="text-lg font-bold text-gray-900">{inq.subject}</h4>
+        <div key={inq.id} className="p-8 border border-gray-100 rounded-[2rem] hover:bg-gray-50 transition-all group">
+          <div className="flex justify-between items-start mb-6">
+            <div className="space-y-1">
+              <div className="flex items-center gap-3">
+                <span className="text-[10px] font-black text-blue-900 bg-blue-50 px-2 py-1 rounded-md uppercase tracking-widest">
+                  {new Date(inq.createdAt).toLocaleDateString()}
+                </span>
+                <span className="text-xs text-gray-400">{new Date(inq.createdAt).toLocaleTimeString()}</span>
+              </div>
+              <h4 className="text-xl font-bold text-gray-900">{inq.subject}</h4>
             </div>
-            <div className="text-right text-sm text-gray-500">
-              <div className="font-bold text-gray-900">{inq.name}</div>
-              <div>{inq.phone}</div>
-              <div>{inq.email}</div>
+            <button 
+              onClick={() => handleDelete(inq.id)}
+              className="p-2 text-gray-300 hover:text-red-500 transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 p-6 bg-white rounded-2xl border border-gray-50 shadow-sm">
+            <div className="space-y-1">
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">성함</p>
+              <p className="font-bold text-gray-900">{inq.name}</p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">연락처</p>
+              <p className="font-bold text-gray-900">{inq.phone}</p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">이메일</p>
+              <p className="font-bold text-gray-900">{inq.email}</p>
             </div>
           </div>
-          <p className="text-gray-600 text-sm whitespace-pre-wrap bg-white p-4 rounded-xl border border-gray-50">
-            {inq.message}
-          </p>
+
+          <div className="space-y-2">
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">문의 내용</p>
+            <p className="text-gray-600 leading-relaxed whitespace-pre-wrap">
+              {inq.message}
+            </p>
+          </div>
         </div>
       ))}
-      {inquiries.length === 0 && <div className="text-center py-12 text-gray-400">접수된 문의가 없습니다.</div>}
+      {inquiries.length === 0 && (
+        <div className="text-center py-20 bg-gray-50 rounded-[2.5rem] border-2 border-dashed border-gray-200">
+          <p className="text-gray-400 font-medium">접수된 문의가 없습니다.</p>
+        </div>
+      )}
     </div>
   );
 };
