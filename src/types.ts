@@ -4,6 +4,7 @@ export interface SiteConfig {
   secondaryColor: string;
   heroTitle: string;
   heroSubtitle: string;
+  heroImageUrl?: string;
   contactEmail: string;
   contactPhone: string;
   fax?: string;

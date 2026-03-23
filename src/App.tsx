@@ -346,7 +346,7 @@ const Home = ({ config, products }: { config: SiteConfig; products: Product[] })
           }}
         >
           <img
-            src="https://images.unsplash.com/photo-1597733336794-12d05021d510?auto=format&fit=crop&w=1920&q=80"
+            src={config.heroImageUrl || "https://images.unsplash.com/photo-1597733336794-12d05021d510?auto=format&fit=crop&w=1920&q=80"}
             alt="과자 자동화 생산 라인"
             className="w-full h-full object-cover opacity-30 scale-110 brightness-105 contrast-110 transition-opacity duration-1000"
             referrerPolicy="no-referrer"
@@ -931,6 +931,46 @@ const ConfigEditor = ({ config }: { config: SiteConfig }) => {
     </div>
   );
 
+  const handleHeroImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+        const MAX_SIZE = 1920; // High res for hero
+
+        if (width > height) {
+          if (width > MAX_SIZE) {
+            height *= MAX_SIZE / width;
+            width = MAX_SIZE;
+          }
+        } else {
+          if (height > MAX_SIZE) {
+            width *= MAX_SIZE / height;
+            height = MAX_SIZE;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          const base64String = canvas.toDataURL('image/jpeg', 0.8);
+          setLocalConfig({ ...localConfig, heroImageUrl: base64String });
+        }
+      };
+      img.src = event.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
+
   return (
     <div className="space-y-10">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -949,9 +989,31 @@ const ConfigEditor = ({ config }: { config: SiteConfig }) => {
       </div>
 
       <div className="space-y-6">
-        <h3 className="text-lg font-bold text-gray-900 border-l-4 border-blue-900 pl-4">메인 화면 문구</h3>
-        <InputField label="메인 타이틀" value={localConfig.heroTitle} onChange={(v: string) => setLocalConfig({ ...localConfig, heroTitle: v })} />
-        <InputField label="메인 서브타이틀" textarea value={localConfig.heroSubtitle} onChange={(v: string) => setLocalConfig({ ...localConfig, heroSubtitle: v })} />
+        <h3 className="text-lg font-bold text-gray-900 border-l-4 border-blue-900 pl-4">메인 화면 설정</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div className="space-y-6">
+            <InputField label="메인 타이틀" value={localConfig.heroTitle} onChange={(v: string) => setLocalConfig({ ...localConfig, heroTitle: v })} />
+            <InputField label="메인 서브타이틀" textarea value={localConfig.heroSubtitle} onChange={(v: string) => setLocalConfig({ ...localConfig, heroSubtitle: v })} />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-bold text-gray-700 uppercase tracking-wider">메인 배경 이미지</label>
+            <div className="relative aspect-video rounded-2xl overflow-hidden bg-gray-100 border border-gray-200 group">
+              {localConfig.heroImageUrl ? (
+                <img src={localConfig.heroImageUrl} className="w-full h-full object-cover" alt="Hero Preview" referrerPolicy="no-referrer" />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-gray-300">
+                  <Image className="w-12 h-12" />
+                </div>
+              )}
+              <label className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center cursor-pointer text-white">
+                <Upload className="w-8 h-8 mb-2" />
+                <span className="text-sm font-bold">배경 이미지 변경</span>
+                <input type="file" accept="image/*" className="hidden" onChange={handleHeroImageUpload} />
+              </label>
+            </div>
+            <p className="text-[10px] text-gray-400">메인 화면의 배경 이미지를 업로드하세요. (권장: 1920x1080)</p>
+          </div>
+        </div>
       </div>
 
       <div className="pt-8 border-t border-gray-100">
@@ -976,6 +1038,7 @@ const ProductManager = ({ products }: { products: Product[] }) => {
     if (!files || files.length === 0) return;
 
     const processFile = (file: File) => {
+      console.log('Processing file:', file.name, file.size);
       if (!file.type.startsWith('image/')) {
         console.warn('Not an image file:', file.type);
         return;
@@ -984,14 +1047,18 @@ const ProductManager = ({ products }: { products: Product[] }) => {
       const reader = new FileReader();
       reader.onload = (event) => {
         const result = event.target?.result;
-        if (typeof result !== 'string') return;
+        if (typeof result !== 'string') {
+          console.error('FileReader result is not a string');
+          return;
+        }
 
         const img = new Image();
         img.onload = () => {
+          console.log('Image loaded, resizing...');
           const canvas = document.createElement('canvas');
           let width = img.width;
           let height = img.height;
-          const MAX_SIZE = 800;
+          const MAX_SIZE = 1024; // Slightly larger for better quality
 
           if (width > height) {
             if (width > MAX_SIZE) {
@@ -1011,24 +1078,30 @@ const ProductManager = ({ products }: { products: Product[] }) => {
           if (ctx) {
             ctx.drawImage(img, 0, 0, width, height);
             const base64String = canvas.toDataURL('image/jpeg', 0.7);
+            console.log('Image processed, base64 length:', base64String.length);
             
             setEditing(prev => {
-              if (!prev) return null;
+              if (!prev) {
+                console.warn('setEditing called but prev is null');
+                return null;
+              }
               if (type === 'main') {
                 return { ...prev, imageUrl: base64String };
               } else {
+                const newGallery = [...(prev.gallery || []), base64String];
+                console.log('New gallery size:', newGallery.length);
                 return {
                   ...prev,
-                  gallery: [...(prev.gallery || []), base64String]
+                  gallery: newGallery
                 };
               }
             });
           }
         };
-        img.onerror = () => console.error('Failed to load image');
+        img.onerror = () => console.error('Failed to load image into Image object');
         img.src = result;
       };
-      reader.onerror = () => console.error('Failed to read file');
+      reader.onerror = () => console.error('FileReader error');
       reader.readAsDataURL(file);
     };
 
@@ -1353,6 +1426,7 @@ const DEFAULT_CONFIG: SiteConfig = {
   secondaryColor: '#3b82f6',
   heroTitle: '식품 기계 제작의 명가, 세일엔지니어링',
   heroSubtitle: '최첨단 터널형 스틸밴드 오븐과 자동화 설비로 귀사의 생산 가치를 높여드립니다.',
+  heroImageUrl: 'https://images.unsplash.com/photo-1597733336794-12d05021d510?auto=format&fit=crop&w=1920&q=80',
   contactEmail: 'seil2013@hanmail.net',
   contactPhone: '031-534-6431',
   fax: '031-534-6432',
