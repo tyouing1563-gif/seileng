@@ -799,12 +799,14 @@ const AdminDashboard = ({ config, products, user }: { config: SiteConfig; produc
                   .catch(error => {
                     console.error("Login Error:", error);
                     let errorMsg = error.message;
+                    const currentDomain = window.location.hostname;
+                    
                     if (error.code === 'auth/unauthorized-domain') {
-                      errorMsg = "현재 도메인이 Firebase 승인 도메인 목록에 없습니다. 관리자에게 문의하세요.";
+                      errorMsg = `현재 도메인(${currentDomain})이 Firebase 승인 목록에 없습니다.\n\n해결 방법:\n1. '새 탭에서 열기' 버튼을 눌러 접속해 보세요.\n2. Firebase 콘솔에서 '${currentDomain}'을 승인된 도메인에 추가해 주세요.`;
                     } else if (error.code === 'auth/popup-blocked') {
-                      errorMsg = "브라우저에서 팝업이 차단되었습니다. 팝업 차단을 해제하고 다시 시도해 주세요.";
+                      errorMsg = "브라우저에서 팝업이 차단되었습니다. 주소창 오른쪽의 팝업 차단 아이콘을 눌러 허용해 주세요.";
                     }
-                    alert(`로그인 중 오류가 발생했습니다 (${error.code}):\n${errorMsg}`);
+                    alert(`로그인 오류 (${error.code}):\n\n${errorMsg}`);
                   });
               }}
               className="w-full py-4 bg-blue-900 text-white font-bold rounded-2xl hover:bg-blue-800 transition-all shadow-lg shadow-blue-900/20 flex items-center justify-center gap-3"
