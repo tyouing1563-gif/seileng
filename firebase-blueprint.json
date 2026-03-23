@@ -1,0 +1,63 @@
+{
+  "entities": {
+    "siteConfig": {
+      "title": "Site Configuration",
+      "description": "Global settings for the website's appearance and content.",
+      "type": "object",
+      "properties": {
+        "siteName": { "type": "string", "description": "The name of the company." },
+        "primaryColor": { "type": "string", "description": "The primary theme color (hex)." },
+        "secondaryColor": { "type": "string", "description": "The secondary theme color (hex)." },
+        "heroTitle": { "type": "string", "description": "Main headline on the home page." },
+        "heroSubtitle": { "type": "string", "description": "Sub-headline on the home page." },
+        "contactEmail": { "type": "string", "description": "Public contact email." },
+        "contactPhone": { "type": "string", "description": "Public contact phone number." },
+        "fax": { "type": "string", "description": "Public contact fax number." },
+        "representative": { "type": "string", "description": "Company representative name." },
+        "address": { "type": "string", "description": "Company address." }
+      },
+      "required": ["siteName", "primaryColor"]
+    },
+    "product": {
+      "title": "Product",
+      "description": "Food machinery or tunnel oven product details.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Product name." },
+        "category": { "type": "string", "description": "Category (e.g., Tunnel Oven, Mixer)." },
+        "description": { "type": "string", "description": "Detailed description." },
+        "imageUrl": { "type": "string", "description": "URL to the product image." },
+        "features": { "type": "array", "items": { "type": "string" }, "description": "List of key features." }
+      },
+      "required": ["name", "category", "description"]
+    },
+    "inquiry": {
+      "title": "Inquiry",
+      "description": "Customer contact form submission.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Customer name." },
+        "email": { "type": "string", "description": "Customer email." },
+        "phone": { "type": "string", "description": "Customer phone." },
+        "subject": { "type": "string", "description": "Inquiry subject." },
+        "message": { "type": "string", "description": "Inquiry message." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Submission timestamp." }
+      },
+      "required": ["name", "email", "message"]
+    }
+  },
+  "firestore": {
+    "config/main": {
+      "schema": "siteConfig",
+      "description": "Main site configuration document."
+    },
+    "products": {
+      "schema": "product",
+      "description": "Collection of products."
+    },
+    "inquiries": {
+      "schema": "inquiry",
+      "description": "Collection of customer inquiries."
+    }
+  }
+}

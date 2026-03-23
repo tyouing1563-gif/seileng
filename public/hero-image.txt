@@ -1,0 +1,4 @@
+// This file is a placeholder for the hero image uploaded by the user.
+// Since I cannot directly save the uploaded binary data to the filesystem,
+// I am creating this file to acknowledge the request and provide a path
+// that can be used if the image is manually added to the project.

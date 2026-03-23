@@ -1,0 +1,139 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: config
+    // Document ID: main
+    // Fields:
+    //   - siteName: string (required, 1-100 chars)
+    //   - primaryColor: string (required, hex format)
+    //   - secondaryColor: string (required, hex format)
+    //   - heroTitle: string (required, 1-200 chars)
+    //   - heroSubtitle: string (required, 1-500 chars)
+    //   - contactEmail: string (required, email format)
+    //   - contactPhone: string (required, phone format)
+    //   - fax: string (optional, 1-20 chars)
+    //   - representative: string (optional, 1-50 chars)
+    //   - address: string (required, 1-200 chars)
+    //
+    // Collection: products
+    // Document ID: auto-generated or manual
+    // Fields:
+    //   - name: string (required, 1-100 chars)
+    //   - category: string (required, 1-50 chars)
+    //   - description: string (required, 1-2000 chars)
+    //   - imageUrl: string (required, URL format)
+    //   - features: list (required, max 20 items)
+    //
+    // Collection: inquiries
+    // Document ID: auto-generated
+    // Fields:
+    //   - name: string (required, 1-50 chars)
+    //   - email: string (required, email format)
+    //   - phone: string (required, 1-20 chars)
+    //   - subject: string (required, 1-100 chars)
+    //   - message: string (required, 1-2000 chars)
+    //   - createdAt: string (required, ISO 8601)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && (
+        request.auth.token.email == "tyouing1563@gmail.com" ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin')
+      );
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function isValidUrl(url) {
+      return url is string && (url.matches("^https://.*") || url.matches("^http://.*"));
+    }
+
+    function isValidDateString(dateStr) {
+      return dateStr is string && dateStr.matches("^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}.*Z?$");
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidConfig(data) {
+      return data.siteName is string && data.siteName.size() >= 1 && data.siteName.size() <= 100 &&
+             data.primaryColor is string && data.primaryColor.matches("^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$") &&
+             data.heroTitle is string && data.heroTitle.size() <= 200 &&
+             isValidEmail(data.contactEmail) &&
+             (!('fax' in data) || (data.fax is string && data.fax.size() <= 20)) &&
+             (!('representative' in data) || (data.representative is string && data.representative.size() <= 50));
+    }
+
+    function isValidProduct(data) {
+      return data.name is string && data.name.size() >= 1 && data.name.size() <= 100 &&
+             data.category is string && data.category.size() <= 50 &&
+             data.description is string && data.description.size() <= 2000 &&
+             isValidUrl(data.imageUrl) &&
+             data.features is list && data.features.size() <= 20;
+    }
+
+    function isValidInquiry(data) {
+      return data.name is string && data.name.size() >= 1 && data.name.size() <= 50 &&
+             isValidEmail(data.email) &&
+             data.phone is string && data.phone.size() <= 20 &&
+             data.subject is string && data.subject.size() <= 100 &&
+             data.message is string && data.message.size() <= 2000 &&
+             isValidDateString(data.createdAt);
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    // Test connection
+    match /test/{docId} {
+      allow read: if true;
+    }
+
+    // Site Configuration
+    match /config/{configId} {
+      allow read: if true;
+      allow write: if isAdmin() && isValidConfig(request.resource.data);
+    }
+
+    // Products
+    match /products/{productId} {
+      allow read: if true;
+      allow write: if isAdmin() && isValidProduct(request.resource.data);
+    }
+
+    // Inquiries
+    match /inquiries/{inquiryId} {
+      allow read: if isAdmin();
+      allow create: if isValidInquiry(request.resource.data);
+      allow update, delete: if isAdmin();
+    }
+
+    // Users
+    match /users/{userId} {
+      allow read: if isAuthenticated() && request.auth.uid == userId;
+      allow write: if isAdmin();
+    }
+  }
+}
