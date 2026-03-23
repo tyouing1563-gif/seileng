@@ -438,26 +438,21 @@ const Home = ({ config, products }: { config: SiteConfig; products: Product[] })
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {products.slice(0, 3).map((product) => (
-            <Link key={product.id} to={`/products`} className="group">
-              <div className="relative aspect-[4/3] overflow-hidden rounded-2xl mb-6 bg-gray-100">
-                <img
-                  src={product.imageUrl}
-                  alt={product.name}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                  referrerPolicy="no-referrer"
-                />
-                <div className="absolute top-4 left-4">
-                  <span className="px-3 py-1 bg-white/90 backdrop-blur-sm text-xs font-bold text-blue-900 rounded-full shadow-sm">
-                    {product.category}
-                  </span>
-                </div>
+            <Link key={product.id} to={`/products`} className="group p-8 bg-white rounded-3xl border border-gray-100 shadow-sm hover:shadow-md transition-all">
+              <div className="mb-6">
+                <span className="px-3 py-1 bg-blue-50 text-xs font-bold text-blue-900 rounded-full">
+                  {product.category}
+                </span>
               </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-2 group-hover:text-blue-900 transition-colors">
+              <h3 className="text-xl font-bold text-gray-900 mb-4 group-hover:text-blue-900 transition-colors">
                 {product.name}
               </h3>
-              <p className="text-gray-600 text-sm line-clamp-2 leading-relaxed">
+              <p className="text-gray-600 text-sm line-clamp-3 leading-relaxed mb-6">
                 {product.description}
               </p>
+              <div className="flex items-center text-blue-900 font-bold text-sm">
+                자세히 보기 <ChevronRight className="ml-1 w-4 h-4 group-hover:translate-x-1 transition-transform" />
+              </div>
             </Link>
           ))}
         </div>
@@ -541,22 +536,6 @@ const ProductsPage = ({ products }: { products: Product[] }) => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {filteredProducts.map((product) => (
             <div key={product.id} className="bg-white rounded-2xl overflow-hidden border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
-              <div className="aspect-video bg-gray-100 overflow-hidden relative group">
-                <img
-                  src={product.imageUrl}
-                  alt={product.name}
-                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                  referrerPolicy="no-referrer"
-                />
-                {product.gallery && product.gallery.length > 0 && (
-                  <div className="absolute bottom-4 right-4 flex gap-1">
-                    {product.gallery.slice(0, 3).map((_, i) => (
-                      <div key={i} className="w-1.5 h-1.5 bg-white/80 rounded-full shadow-sm" />
-                    ))}
-                    {product.gallery.length > 3 && <div className="text-[8px] text-white font-bold">+{product.gallery.length - 3}</div>}
-                  </div>
-                )}
-              </div>
               <div className="p-8">
                 <span className="text-xs font-bold text-blue-900 uppercase tracking-wider mb-2 block">
                   {product.category}
@@ -573,6 +552,18 @@ const ProductsPage = ({ products }: { products: Product[] }) => {
                     </div>
                   ))}
                 </div>
+                
+                {/* Gallery Preview if available */}
+                {product.gallery && product.gallery.length > 0 && (
+                  <div className="mt-6 grid grid-cols-4 gap-2">
+                    {product.gallery.slice(0, 4).map((img, i) => (
+                      <div key={i} className="aspect-square rounded-lg overflow-hidden bg-gray-50 border border-gray-100">
+                        <img src={img} className="w-full h-full object-cover" alt="" referrerPolicy="no-referrer" />
+                      </div>
+                    ))}
+                  </div>
+                )}
+
                 <Link
                   to="/contact"
                   className="mt-8 block w-full py-3 text-center border border-blue-900 text-blue-900 font-bold rounded-lg hover:bg-blue-50 transition-colors"
@@ -984,23 +975,50 @@ const ProductManager = ({ products }: { products: Product[] }) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Limit file size to ~500KB for Base64 storage in Firestore
-    if (file.size > 512 * 1024) {
-      alert('이미지 크기가 너무 큽니다. 500KB 이하의 이미지를 사용해 주세요.');
-      return;
-    }
-
+    // Show loading state or feedback if needed
     const reader = new FileReader();
-    reader.onloadend = () => {
-      const base64String = reader.result as string;
-      if (type === 'main') {
-        setEditing(prev => ({ ...prev, imageUrl: base64String }));
-      } else {
-        setEditing(prev => ({
-          ...prev,
-          gallery: [...(prev?.gallery || []), base64String]
-        }));
-      }
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        // Create canvas for resizing
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+
+        // Max dimension 800px for thumbnails/previews to save space
+        const MAX_WIDTH = 800;
+        const MAX_HEIGHT = 800;
+
+        if (width > height) {
+          if (width > MAX_WIDTH) {
+            height *= MAX_WIDTH / width;
+            width = MAX_WIDTH;
+          }
+        } else {
+          if (height > MAX_HEIGHT) {
+            width *= MAX_HEIGHT / height;
+            height = MAX_HEIGHT;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx?.drawImage(img, 0, 0, width, height);
+
+        // Compress to JPEG with 0.7 quality
+        const base64String = canvas.toDataURL('image/jpeg', 0.7);
+        
+        if (type === 'main') {
+          setEditing(prev => ({ ...prev, imageUrl: base64String }));
+        } else {
+          setEditing(prev => ({
+            ...prev,
+            gallery: [...(prev?.gallery || []), base64String]
+          }));
+        }
+      };
+      img.src = event.target?.result as string;
     };
     reader.readAsDataURL(file);
   };
@@ -1112,7 +1130,7 @@ const ProductManager = ({ products }: { products: Product[] }) => {
                     <div className="flex items-start gap-4">
                       <div className="w-32 h-32 rounded-2xl bg-white border border-gray-200 overflow-hidden flex items-center justify-center relative group">
                         {editing.imageUrl ? (
-                          <img src={editing.imageUrl} className="w-full h-full object-cover" alt="Preview" />
+                          <img src={editing.imageUrl} className="w-full h-full object-cover" alt="Preview" referrerPolicy="no-referrer" />
                         ) : (
                           <Camera className="w-8 h-8 text-gray-300" />
                         )}
@@ -1138,7 +1156,7 @@ const ProductManager = ({ products }: { products: Product[] }) => {
                     <div className="grid grid-cols-4 gap-2">
                       {editing.gallery?.map((img, idx) => (
                         <div key={idx} className="aspect-square rounded-lg bg-white border border-gray-200 overflow-hidden relative group">
-                          <img src={img} className="w-full h-full object-cover" alt={`Gallery ${idx}`} />
+                          <img src={img} className="w-full h-full object-cover" alt={`Gallery ${idx}`} referrerPolicy="no-referrer" />
                           <button 
                             onClick={() => removeGalleryImage(idx)}
                             className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
