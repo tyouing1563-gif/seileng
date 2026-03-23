@@ -5,7 +5,7 @@ import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut, User 
 import { doc, onSnapshot, collection, query, orderBy, getDoc, setDoc, getDocFromServer, deleteDoc } from 'firebase/firestore';
 import { auth, db } from './firebase';
 import { SiteConfig, Product, UserProfile, Inquiry } from './types';
-import { Menu, X, Settings, LogOut, Phone, Mail, MapPin, ChevronRight, ChevronDown, Factory, Utensils, ShieldCheck, Clock, AlertCircle, Quote, Camera, Upload, Image } from 'lucide-react';
+import { Menu, X, Settings, LogOut, Phone, Mail, MapPin, ChevronRight, ChevronDown, Factory, Utensils, ShieldCheck, Clock, AlertCircle, Quote, Camera, Upload, Image as ImageIcon, Loader2, Plus } from 'lucide-react';
 import { motion, AnimatePresence, useScroll, useTransform } from 'motion/react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -69,6 +69,57 @@ function handleFirestoreError(error: unknown, operationType: OperationType, path
 }
 
 // --- Components ---
+
+const Lightbox = ({ imageUrl, onClose }: { imageUrl: string | null; onClose: () => void }) => {
+  useEffect(() => {
+    if (imageUrl) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, [imageUrl]);
+
+  return (
+    <AnimatePresence>
+      {imageUrl && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          onClick={onClose}
+          className="fixed inset-0 z-[100] bg-black/95 flex items-center justify-center p-4 md:p-12 cursor-zoom-out"
+        >
+          <motion.button
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="absolute top-6 right-6 text-white/70 hover:text-white transition-colors z-[110]"
+            onClick={onClose}
+          >
+            <X className="w-10 h-10" />
+          </motion.button>
+          
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.9, opacity: 0 }}
+            className="relative max-w-7xl max-h-full flex items-center justify-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <img
+              src={imageUrl}
+              alt="Enlarged view"
+              className="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl select-none"
+              referrerPolicy="no-referrer"
+            />
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+};
 
 const isAdmin = (user: User | null) => {
   if (!user?.email) return false;
@@ -321,6 +372,7 @@ const Footer = ({ config }: { config: SiteConfig }) => (
 // --- Pages ---
 
 const Home = ({ config, products }: { config: SiteConfig; products: Product[] }) => {
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const { scrollY } = useScroll();
   const yParallax = useTransform(scrollY, [0, 500], [0, 150]);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
@@ -438,25 +490,45 @@ const Home = ({ config, products }: { config: SiteConfig; products: Product[] })
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {products.slice(0, 3).map((product) => (
-            <Link key={product.id} to={`/products`} className="group p-8 bg-white rounded-3xl border border-gray-100 shadow-sm hover:shadow-md transition-all">
-              <div className="mb-6">
-                <span className="px-3 py-1 bg-blue-50 text-xs font-bold text-blue-900 rounded-full">
-                  {product.category}
-                </span>
+            <div key={product.id} className="group bg-white rounded-3xl border border-gray-100 shadow-sm hover:shadow-md transition-all overflow-hidden flex flex-col">
+              {product.imageUrl && (
+                <div 
+                  className="aspect-[4/3] overflow-hidden bg-gray-100 cursor-zoom-in relative"
+                  onClick={() => setSelectedImage(product.imageUrl)}
+                >
+                  <img src={product.imageUrl} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" alt={product.name} referrerPolicy="no-referrer" />
+                  <div className="absolute inset-0 bg-black/0 hover:bg-black/20 transition-colors flex items-center justify-center group/img">
+                    <ImageIcon className="w-8 h-8 text-white opacity-0 group-hover/img:opacity-100 transition-opacity" />
+                  </div>
+                </div>
+              )}
+              <div className="p-8 flex-grow flex flex-col">
+                <div className="mb-6">
+                  <span className="px-3 py-1 bg-blue-50 text-xs font-bold text-blue-900 rounded-full">
+                    {product.category}
+                  </span>
+                </div>
+                <h3 className="text-xl font-bold text-gray-900 mb-4 group-hover:text-blue-900 transition-colors">
+                  {product.name}
+                </h3>
+                <p className="text-gray-600 text-sm line-clamp-3 leading-relaxed mb-6">
+                  {product.description}
+                </p>
+                <div className="mt-auto flex items-center justify-between">
+                  <Link 
+                    to={`/products?category=${encodeURIComponent(product.category)}`}
+                    className="flex items-center text-blue-900 font-bold text-sm hover:underline"
+                  >
+                    자세히 보기 <ChevronRight className="ml-1 w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                  </Link>
+                </div>
               </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-4 group-hover:text-blue-900 transition-colors">
-                {product.name}
-              </h3>
-              <p className="text-gray-600 text-sm line-clamp-3 leading-relaxed mb-6">
-                {product.description}
-              </p>
-              <div className="flex items-center text-blue-900 font-bold text-sm">
-                자세히 보기 <ChevronRight className="ml-1 w-4 h-4 group-hover:translate-x-1 transition-transform" />
-              </div>
-            </Link>
+            </div>
           ))}
         </div>
       </div>
+      
+      <Lightbox imageUrl={selectedImage} onClose={() => setSelectedImage(null)} />
     </section>
 
     {/* CTA Section */}
@@ -488,6 +560,7 @@ const ProductsPage = ({ products }: { products: Product[] }) => {
   const [searchParams, setSearchParams] = useSearchParams();
   const categoryParam = searchParams.get('category');
   const [filter, setFilter] = useState(categoryParam || '전체');
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const categories = ['전체', ...Array.from(new Set(products.map(p => p.category)))];
 
   useEffect(() => {
@@ -535,8 +608,24 @@ const ProductsPage = ({ products }: { products: Product[] }) => {
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {filteredProducts.map((product) => (
-            <div key={product.id} className="bg-white rounded-2xl overflow-hidden border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
-              <div className="p-8">
+            <div key={product.id} className="bg-white rounded-2xl overflow-hidden border border-gray-100 shadow-sm hover:shadow-md transition-shadow flex flex-col">
+              {product.imageUrl && (
+                <div 
+                  className="aspect-[4/3] overflow-hidden bg-gray-100 cursor-zoom-in relative group"
+                  onClick={() => setSelectedImage(product.imageUrl)}
+                >
+                  <img 
+                    src={product.imageUrl} 
+                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" 
+                    alt={product.name} 
+                    referrerPolicy="no-referrer" 
+                  />
+                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+                    <ImageIcon className="w-8 h-8 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </div>
+                </div>
+              )}
+              <div className="p-8 flex-grow flex flex-col">
                 <span className="text-xs font-bold text-blue-900 uppercase tracking-wider mb-2 block">
                   {product.category}
                 </span>
@@ -544,7 +633,7 @@ const ProductsPage = ({ products }: { products: Product[] }) => {
                 <p className="text-gray-600 text-sm leading-relaxed mb-6">
                   {product.description}
                 </p>
-                <div className="space-y-2">
+                <div className="space-y-2 mb-6">
                   {product.features.map((feature, i) => (
                     <div key={i} className="flex items-center text-xs text-gray-500">
                       <div className="w-1.5 h-1.5 bg-blue-900 rounded-full mr-2" />
@@ -555,12 +644,20 @@ const ProductsPage = ({ products }: { products: Product[] }) => {
                 
                 {/* Gallery Preview if available */}
                 {product.gallery && product.gallery.length > 0 && (
-                  <div className="mt-6 grid grid-cols-4 gap-2">
-                    {product.gallery.slice(0, 4).map((img, i) => (
-                      <div key={i} className="aspect-square rounded-lg overflow-hidden bg-gray-50 border border-gray-100">
-                        <img src={img} className="w-full h-full object-cover" alt="" referrerPolicy="no-referrer" />
-                      </div>
-                    ))}
+                  <div className="mt-auto pt-6 border-t border-gray-100">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3 block">상세 사진</label>
+                    <div className="grid grid-cols-4 gap-2">
+                      {product.gallery.slice(0, 4).map((img, i) => (
+                        <div 
+                          key={i} 
+                          className="aspect-square rounded-lg overflow-hidden bg-gray-50 border border-gray-100 cursor-zoom-in relative group"
+                          onClick={() => setSelectedImage(img)}
+                        >
+                          <img src={img} className="w-full h-full object-cover" alt="" referrerPolicy="no-referrer" />
+                          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
 
@@ -575,6 +672,8 @@ const ProductsPage = ({ products }: { products: Product[] }) => {
           ))}
         </div>
       </div>
+      
+      <Lightbox imageUrl={selectedImage} onClose={() => setSelectedImage(null)} />
     </div>
   );
 };
@@ -897,14 +996,20 @@ const ConfigEditor = ({ config }: { config: SiteConfig }) => {
   const [localConfig, setLocalConfig] = useState(config);
   const [isSaving, setIsSaving] = useState(false);
 
+  useEffect(() => {
+    setLocalConfig(config);
+  }, [config]);
+
   const handleSave = async () => {
+    console.log('Saving config:', localConfig);
     setIsSaving(true);
     try {
       await setDoc(doc(db, 'config', 'main'), localConfig);
+      console.log('Config saved successfully');
       alert('설정이 저장되었습니다.');
     } catch (error) {
-      console.error(error);
-      alert('권한이 없거나 오류가 발생했습니다.');
+      console.error('Error saving config:', error);
+      alert('권한이 없거나 오류가 발생했습니다. (데이터 용량이 너무 클 수 있습니다)');
     } finally {
       setIsSaving(false);
     }
@@ -942,7 +1047,7 @@ const ConfigEditor = ({ config }: { config: SiteConfig }) => {
         const canvas = document.createElement('canvas');
         let width = img.width;
         let height = img.height;
-        const MAX_SIZE = 1920; // High res for hero
+        const MAX_SIZE = 1280; // Optimized for hero without hitting 1MB limit easily
 
         if (width > height) {
           if (width > MAX_SIZE) {
@@ -1002,7 +1107,7 @@ const ConfigEditor = ({ config }: { config: SiteConfig }) => {
                 <img src={localConfig.heroImageUrl} className="w-full h-full object-cover" alt="Hero Preview" referrerPolicy="no-referrer" />
               ) : (
                 <div className="w-full h-full flex items-center justify-center text-gray-300">
-                  <Image className="w-12 h-12" />
+                  <ImageIcon className="w-12 h-12" />
                 </div>
               )}
               <label className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center cursor-pointer text-white">
@@ -1032,15 +1137,26 @@ const ConfigEditor = ({ config }: { config: SiteConfig }) => {
 const ProductManager = ({ products }: { products: Product[] }) => {
   const [editing, setEditing] = useState<Partial<Product> | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isProcessingImages, setIsProcessingImages] = useState(false);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, type: 'main' | 'gallery') => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
+    if (type === 'gallery' && (editing?.gallery?.length || 0) + files.length > 12) {
+      alert('갤러리 이미지는 최대 12개까지만 등록 가능합니다.');
+      return;
+    }
+
+    setIsProcessingImages(true);
+    let processedCount = 0;
+    const totalFiles = type === 'main' ? 1 : files.length;
+
     const processFile = (file: File) => {
       console.log('Processing file:', file.name, file.size);
       if (!file.type.startsWith('image/')) {
         console.warn('Not an image file:', file.type);
+        checkCompletion();
         return;
       }
 
@@ -1049,16 +1165,17 @@ const ProductManager = ({ products }: { products: Product[] }) => {
         const result = event.target?.result;
         if (typeof result !== 'string') {
           console.error('FileReader result is not a string');
+          checkCompletion();
           return;
         }
 
-        const img = new Image();
+        const img = new window.Image(); // Explicitly use window.Image to avoid shadowing
         img.onload = () => {
           console.log('Image loaded, resizing...');
           const canvas = document.createElement('canvas');
           let width = img.width;
           let height = img.height;
-          const MAX_SIZE = 1024; // Slightly larger for better quality
+          const MAX_SIZE = type === 'main' ? 1280 : 1024;
 
           if (width > height) {
             if (width > MAX_SIZE) {
@@ -1081,28 +1198,37 @@ const ProductManager = ({ products }: { products: Product[] }) => {
             console.log('Image processed, base64 length:', base64String.length);
             
             setEditing(prev => {
-              if (!prev) {
-                console.warn('setEditing called but prev is null');
-                return null;
-              }
+              if (!prev) return null;
               if (type === 'main') {
                 return { ...prev, imageUrl: base64String };
               } else {
-                const newGallery = [...(prev.gallery || []), base64String];
-                console.log('New gallery size:', newGallery.length);
                 return {
                   ...prev,
-                  gallery: newGallery
+                  gallery: [...(prev.gallery || []), base64String]
                 };
               }
             });
           }
+          checkCompletion();
         };
-        img.onerror = () => console.error('Failed to load image into Image object');
+        img.onerror = () => {
+          console.error('Failed to load image into Image object');
+          checkCompletion();
+        };
         img.src = result;
       };
-      reader.onerror = () => console.error('FileReader error');
+      reader.onerror = () => {
+        console.error('FileReader error');
+        checkCompletion();
+      };
       reader.readAsDataURL(file);
+    };
+
+    const checkCompletion = () => {
+      processedCount++;
+      if (processedCount >= totalFiles) {
+        setIsProcessingImages(false);
+      }
     };
 
     if (type === 'main') {
@@ -1111,7 +1237,6 @@ const ProductManager = ({ products }: { products: Product[] }) => {
       Array.from(files).forEach(processFile);
     }
     
-    // Reset input value to allow selecting the same file again
     e.target.value = '';
   };
 
@@ -1136,12 +1261,14 @@ const ProductManager = ({ products }: { products: Product[] }) => {
         features: editing.features || [],
         gallery: editing.gallery || []
       };
+      console.log('Saving product:', id, productData);
       await setDoc(doc(db, 'products', id), productData);
+      console.log('Product saved successfully');
       setEditing(null);
       alert('제품 정보가 저장되었습니다.');
     } catch (error) {
-      console.error(error);
-      alert('저장 중 오류가 발생했습니다.');
+      console.error('Error saving product:', error);
+      alert('저장 중 오류가 발생했습니다. (이미지 용량이 너무 클 수 있습니다)');
     } finally {
       setIsSaving(false);
     }
@@ -1166,7 +1293,7 @@ const ProductManager = ({ products }: { products: Product[] }) => {
           onClick={() => setEditing({ name: '', category: 'STEEL BAND OVEN', description: '', imageUrl: '', gallery: [], features: [] })}
           className="px-6 py-3 bg-blue-900 text-white rounded-2xl text-sm font-bold hover:bg-blue-800 transition-all flex items-center gap-2"
         >
-          <Settings className="w-4 h-4" /> 새 제품 추가
+          <Plus className="w-4 h-4" /> 새 제품 추가
         </button>
       </div>
 
@@ -1244,7 +1371,10 @@ const ProductManager = ({ products }: { products: Product[] }) => {
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-xs font-bold text-gray-500 uppercase tracking-widest">제품 갤러리 (Additional Photos)</label>
+                    <div className="flex justify-between items-center">
+                      <label className="text-xs font-bold text-gray-500 uppercase tracking-widest">제품 갤러리 (Additional Photos)</label>
+                      <span className="text-[10px] font-bold text-gray-400">{(editing.gallery?.length || 0)} / 12</span>
+                    </div>
                     <div className="grid grid-cols-4 gap-2">
                       {editing.gallery?.map((img, idx) => (
                         <div key={idx} className="aspect-square rounded-lg bg-white border border-gray-200 overflow-hidden relative group">
@@ -1257,11 +1387,20 @@ const ProductManager = ({ products }: { products: Product[] }) => {
                           </button>
                         </div>
                       ))}
-                      <label className="aspect-square rounded-lg bg-white border-2 border-dashed border-gray-200 flex flex-col items-center justify-center cursor-pointer hover:bg-gray-100 transition-colors">
-                        <Camera className="w-5 h-5 text-gray-400 mb-1" />
-                        <span className="text-[10px] text-gray-400 font-bold">추가</span>
-                        <input type="file" accept="image/*" multiple className="hidden" onChange={e => handleImageUpload(e, 'gallery')} />
-                      </label>
+                      {isProcessingImages ? (
+                        <div className="aspect-square rounded-lg bg-gray-100 border-2 border-dashed border-gray-200 flex flex-col items-center justify-center">
+                          <Loader2 className="w-5 h-5 text-blue-900 animate-spin" />
+                          <span className="text-[10px] text-gray-400 font-bold mt-1">처리 중...</span>
+                        </div>
+                      ) : (
+                        (editing.gallery?.length || 0) < 12 && (
+                          <label className="aspect-square rounded-lg bg-white border-2 border-dashed border-gray-200 flex flex-col items-center justify-center cursor-pointer hover:bg-gray-100 transition-colors">
+                            <Camera className="w-5 h-5 text-gray-400 mb-1" />
+                            <span className="text-[10px] text-gray-400 font-bold">추가</span>
+                            <input type="file" accept="image/*" multiple className="hidden" onChange={e => handleImageUpload(e, 'gallery')} />
+                          </label>
+                        )
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1308,7 +1447,7 @@ const ProductManager = ({ products }: { products: Product[] }) => {
                 <div className="flex items-center gap-3">
                   <div className="text-xs font-bold text-blue-900 uppercase tracking-widest">{p.category}</div>
                   <div className="flex items-center gap-1 text-[10px] text-gray-400">
-                    <Image className="w-3 h-3" />
+                    <ImageIcon className="w-3 h-3" />
                     <span>{1 + (p.gallery?.length || 0)} Photos</span>
                   </div>
                 </div>

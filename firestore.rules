@@ -60,8 +60,12 @@ service cloud.firestore {
       return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
     }
 
-    function isValidUrl(url) {
-      return url is string && (url.matches("^https://.*") || url.matches("^http://.*"));
+    function isValidImage(img) {
+      return img is string && (
+        img.matches("^https://.*") || 
+        img.matches("^http://.*") || 
+        img.matches("^data:image/.*")
+      );
     }
 
     function isValidDateString(dateStr) {
@@ -81,6 +85,7 @@ service cloud.firestore {
              data.primaryColor is string && data.primaryColor.matches("^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$") &&
              data.heroTitle is string && data.heroTitle.size() <= 200 &&
              isValidEmail(data.contactEmail) &&
+             (!('heroImageUrl' in data) || isValidImage(data.heroImageUrl)) &&
              (!('fax' in data) || (data.fax is string && data.fax.size() <= 20)) &&
              (!('representative' in data) || (data.representative is string && data.representative.size() <= 50));
     }
@@ -89,7 +94,7 @@ service cloud.firestore {
       return data.name is string && data.name.size() >= 1 && data.name.size() <= 100 &&
              data.category is string && data.category.size() <= 50 &&
              data.description is string && data.description.size() <= 2000 &&
-             isValidUrl(data.imageUrl) &&
+             isValidImage(data.imageUrl) &&
              data.features is list && data.features.size() <= 20 &&
              (!('gallery' in data) || (data.gallery is list && data.gallery.size() <= 10));
     }
