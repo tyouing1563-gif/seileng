@@ -90,7 +90,8 @@ service cloud.firestore {
              data.category is string && data.category.size() <= 50 &&
              data.description is string && data.description.size() <= 2000 &&
              isValidUrl(data.imageUrl) &&
-             data.features is list && data.features.size() <= 20;
+             data.features is list && data.features.size() <= 20 &&
+             (!('gallery' in data) || (data.gallery is list && data.gallery.size() <= 10));
     }
 
     function isValidInquiry(data) {

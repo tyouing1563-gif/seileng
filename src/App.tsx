@@ -755,13 +755,28 @@ const AdminDashboard = ({ config, products, user }: { config: SiteConfig; produc
             <ShieldCheck className="w-10 h-10 text-blue-900" />
           </div>
           <h2 className="text-3xl font-bold text-gray-900 mb-4">관리자 전용 페이지</h2>
-          <p className="text-gray-600 mb-10 leading-relaxed">이 페이지에 접근하려면 관리자 계정으로 로그인해야 합니다.</p>
+          <p className="text-gray-600 mb-6 leading-relaxed">이 페이지에 접근하려면 관리자 계정으로 로그인해야 합니다.</p>
+          
+          {user && !isAdmin(user) && (
+            <div className="mb-8 p-4 bg-red-50 border border-red-100 rounded-2xl text-red-600 text-sm font-medium">
+              <p className="mb-1">권한이 없는 계정입니다:</p>
+              <p className="font-bold">{user.email}</p>
+              <p className="mt-2 text-xs opacity-70">관리자 계정(tyouing1563@gmail.com)으로 다시 로그인해 주세요.</p>
+            </div>
+          )}
+
           <button
-            onClick={() => signInWithPopup(auth, new GoogleAuthProvider())}
+            onClick={() => {
+              signInWithPopup(auth, new GoogleAuthProvider())
+                .catch(error => {
+                  console.error("Login Error:", error);
+                  alert(`로그인 중 오류가 발생했습니다: ${error.message}\n\n브라우저의 팝업 차단 설정을 확인해 주세요.`);
+                });
+            }}
             className="w-full py-4 bg-blue-900 text-white font-bold rounded-2xl hover:bg-blue-800 transition-all shadow-lg shadow-blue-900/20 flex items-center justify-center gap-3"
           >
             <img src="https://www.google.com/favicon.ico" className="w-5 h-5" alt="Google" />
-            Google로 로그인
+            {user ? '다른 계정으로 로그인' : 'Google로 로그인'}
           </button>
         </div>
       </div>
