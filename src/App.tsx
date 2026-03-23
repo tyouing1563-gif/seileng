@@ -598,16 +598,32 @@ const ContactPage = ({ config }: { config: SiteConfig }) => {
     e.preventDefault();
     setStatus('submitting');
     try {
+      // 1. Save to Firestore (for admin dashboard)
       const inquiryRef = doc(collection(db, 'inquiries'));
       await setDoc(inquiryRef, {
         ...form,
         createdAt: new Date().toISOString()
       });
+
+      // 2. Send Email via Backend
+      const response = await fetch('/api/contact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form)
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.warn("Email sending failed, but inquiry was saved to database:", errorData);
+        // We still show success to user if DB save worked, but log the email error
+      }
+
       setStatus('success');
       setForm({ name: '', email: '', phone: '', subject: '', message: '' });
     } catch (error) {
-      console.error(error);
+      console.error("Inquiry submission error:", error);
       setStatus('idle');
+      alert("문의 제출 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.");
     }
   };
 
