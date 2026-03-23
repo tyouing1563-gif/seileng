@@ -971,56 +971,75 @@ const ProductManager = ({ products }: { products: Product[] }) => {
   const [editing, setEditing] = useState<Partial<Product> | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'main' | 'gallery') => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, type: 'main' | 'gallery') => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
 
-    // Show loading state or feedback if needed
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const img = new Image();
-      img.onload = () => {
-        // Create canvas for resizing
-        const canvas = document.createElement('canvas');
-        let width = img.width;
-        let height = img.height;
+    const processFile = (file: File) => {
+      if (!file.type.startsWith('image/')) {
+        console.warn('Not an image file:', file.type);
+        return;
+      }
 
-        // Max dimension 800px for thumbnails/previews to save space
-        const MAX_WIDTH = 800;
-        const MAX_HEIGHT = 800;
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const result = event.target?.result;
+        if (typeof result !== 'string') return;
 
-        if (width > height) {
-          if (width > MAX_WIDTH) {
-            height *= MAX_WIDTH / width;
-            width = MAX_WIDTH;
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+          const MAX_SIZE = 800;
+
+          if (width > height) {
+            if (width > MAX_SIZE) {
+              height *= MAX_SIZE / width;
+              width = MAX_SIZE;
+            }
+          } else {
+            if (height > MAX_SIZE) {
+              width *= MAX_SIZE / height;
+              height = MAX_SIZE;
+            }
           }
-        } else {
-          if (height > MAX_HEIGHT) {
-            width *= MAX_HEIGHT / height;
-            height = MAX_HEIGHT;
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, width, height);
+            const base64String = canvas.toDataURL('image/jpeg', 0.7);
+            
+            setEditing(prev => {
+              if (!prev) return null;
+              if (type === 'main') {
+                return { ...prev, imageUrl: base64String };
+              } else {
+                return {
+                  ...prev,
+                  gallery: [...(prev.gallery || []), base64String]
+                };
+              }
+            });
           }
-        }
-
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        ctx?.drawImage(img, 0, 0, width, height);
-
-        // Compress to JPEG with 0.7 quality
-        const base64String = canvas.toDataURL('image/jpeg', 0.7);
-        
-        if (type === 'main') {
-          setEditing(prev => ({ ...prev, imageUrl: base64String }));
-        } else {
-          setEditing(prev => ({
-            ...prev,
-            gallery: [...(prev?.gallery || []), base64String]
-          }));
-        }
+        };
+        img.onerror = () => console.error('Failed to load image');
+        img.src = result;
       };
-      img.src = event.target?.result as string;
+      reader.onerror = () => console.error('Failed to read file');
+      reader.readAsDataURL(file);
     };
-    reader.readAsDataURL(file);
+
+    if (type === 'main') {
+      processFile(files[0]);
+    } else {
+      Array.from(files).forEach(processFile);
+    }
+    
+    // Reset input value to allow selecting the same file again
+    e.target.value = '';
   };
 
   const removeGalleryImage = (index: number) => {
@@ -1168,7 +1187,7 @@ const ProductManager = ({ products }: { products: Product[] }) => {
                       <label className="aspect-square rounded-lg bg-white border-2 border-dashed border-gray-200 flex flex-col items-center justify-center cursor-pointer hover:bg-gray-100 transition-colors">
                         <Camera className="w-5 h-5 text-gray-400 mb-1" />
                         <span className="text-[10px] text-gray-400 font-bold">추가</span>
-                        <input type="file" accept="image/*" className="hidden" onChange={e => handleImageUpload(e, 'gallery')} />
+                        <input type="file" accept="image/*" multiple className="hidden" onChange={e => handleImageUpload(e, 'gallery')} />
                       </label>
                     </div>
                   </div>
