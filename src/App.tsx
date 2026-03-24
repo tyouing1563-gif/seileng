@@ -1,5 +1,4 @@
-import * as React from 'react';
-import { useEffect, useState, useCallback, Component, ReactNode } from 'react';
+import React, { useEffect, useState, useCallback, Component, ReactNode } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useLocation, useSearchParams } from 'react-router-dom';
 import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut, User } from 'firebase/auth';
 import { doc, onSnapshot, collection, query, orderBy, getDoc, setDoc, getDocFromServer, deleteDoc } from 'firebase/firestore';
@@ -16,6 +15,41 @@ function cn(...inputs: ClassValue[]) {
 }
 
 // --- Error Handling ---
+
+class ErrorBoundary extends (React.Component as any) {
+  state = { hasError: false, error: null };
+  constructor(props: any) {
+    super(props);
+  }
+
+  static getDerivedStateFromError(error: any) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: any, errorInfo: any) {
+    console.error("ErrorBoundary caught an error", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="p-10 text-center bg-red-50 rounded-[2rem] border border-red-100">
+          <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+          <h3 className="text-xl font-bold text-red-900 mb-2">화면을 불러오는 중 오류가 발생했습니다.</h3>
+          <p className="text-red-600 text-sm mb-6">{this.state.error?.message || "알 수 없는 오류"}</p>
+          <button 
+            onClick={() => this.setState({ hasError: false, error: null })}
+            className="px-6 py-2 bg-red-600 text-white rounded-xl font-bold text-sm"
+          >
+            다시 시도
+          </button>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
 
 enum OperationType {
   CREATE = 'create',
@@ -982,9 +1016,11 @@ const AdminDashboard = ({ config, products, user }: { config: SiteConfig; produc
           </div>
 
           <div className="bg-white rounded-[2.5rem] p-10 shadow-sm border border-gray-100">
-            {activeTab === 'config' && <ConfigEditor config={config} />}
-            {activeTab === 'products' && <ProductManager products={products} />}
-            {activeTab === 'inquiries' && <InquiryViewer />}
+            <ErrorBoundary>
+              {activeTab === 'config' && <ConfigEditor config={config} />}
+              {activeTab === 'products' && <ProductManager products={products} />}
+              {activeTab === 'inquiries' && <InquiryViewer user={user} />}
+            </ErrorBoundary>
           </div>
         </div>
       </main>
@@ -1481,16 +1517,41 @@ const ProductManager = ({ products }: { products: Product[] }) => {
   );
 };
 
-const InquiryViewer = () => {
+const InquiryViewer = ({ user }: { user: User }) => {
   const [inquiries, setInquiries] = useState<Inquiry[]>([]);
 
+  const formatDate = (dateStr: string) => {
+    try {
+      const date = new Date(dateStr);
+      return date.toLocaleDateString('ko-KR', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      });
+    } catch (e) {
+      return dateStr;
+    }
+  };
+
+  const formatTime = (dateStr: string) => {
+    try {
+      const date = new Date(dateStr);
+      return date.toLocaleTimeString('ko-KR', {
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch (e) {
+      return "";
+    }
+  };
+
   useEffect(() => {
-    if (!isAdmin(auth.currentUser)) return;
+    if (!user || !isAdmin(user)) return;
     const q = query(collection(db, 'inquiries'), orderBy('createdAt', 'desc'));
     return onSnapshot(q, (snapshot) => {
       setInquiries(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Inquiry)));
     }, (error) => handleFirestoreError(error, OperationType.GET, 'inquiries'));
-  }, []);
+  }, [user]);
 
   const handleDelete = async (id: string) => {
     if (!window.confirm('이 문의 내역을 삭제하시겠습니까?')) return;
@@ -1511,9 +1572,9 @@ const InquiryViewer = () => {
             <div className="space-y-1">
               <div className="flex items-center gap-3">
                 <span className="text-[10px] font-black text-blue-900 bg-blue-50 px-2 py-1 rounded-md uppercase tracking-widest">
-                  {new Date(inq.createdAt).toLocaleDateString()}
+                  {formatDate(inq.createdAt)}
                 </span>
-                <span className="text-xs text-gray-400">{new Date(inq.createdAt).toLocaleTimeString()}</span>
+                <span className="text-xs text-gray-400">{formatTime(inq.createdAt)}</span>
               </div>
               <h4 className="text-xl font-bold text-gray-900">{inq.subject}</h4>
             </div>
@@ -1576,7 +1637,7 @@ const DEFAULT_CONFIG: SiteConfig = {
 const SAMPLE_PRODUCTS: Product[] = [
   {
     id: '1',
-    name: '고성능 STEEL BAND OVEN',
+    name: 'STEEL BAND OVEN',
     category: 'STEEL BAND OVEN',
     description: '균일한 열전달과 에너지 효율을 극대화한 대형 터널 오븐입니다. 대량 생산 라인에 최적화되어 있습니다.',
     imageUrl: 'https://images.unsplash.com/photo-1556910103-1c02745aae4d?auto=format&fit=crop&q=80&w=1000',
@@ -1584,7 +1645,7 @@ const SAMPLE_PRODUCTS: Product[] = [
   },
   {
     id: '2',
-    name: '산업용 벨트컨베이어 시스템',
+    name: '벨트컨베이어',
     category: '벨트컨베이어',
     description: '안정적인 이송과 내구성을 자랑하는 벨트컨베이어입니다. 다양한 식품 생산 라인에 적용 가능합니다.',
     imageUrl: 'https://images.unsplash.com/photo-1590604518089-283770413d6a?auto=format&fit=crop&q=80&w=1000',
@@ -1592,7 +1653,7 @@ const SAMPLE_PRODUCTS: Product[] = [
   },
   {
     id: '3',
-    name: '정밀 샌딩머신',
+    name: '샌딩머신',
     category: '샌딩머신',
     description: '제품 표면에 균일하게 샌딩 처리를 수행하는 자동화 기계입니다.',
     imageUrl: 'https://images.unsplash.com/photo-1555507036-ab1f4038808a?auto=format&fit=crop&q=80&w=1000',
@@ -1600,7 +1661,7 @@ const SAMPLE_PRODUCTS: Product[] = [
   },
   {
     id: '4',
-    name: '오일 및 소금 스프레이 시스템',
+    name: '오일스프레이, 소금스프레이',
     category: '오일스프레이, 소금스프레이',
     description: '제품 표면에 오일과 소금을 정밀하게 분사하여 맛과 품질을 높여주는 설비입니다.',
     imageUrl: 'https://images.unsplash.com/photo-1556910103-1c02745aae4d?auto=format&fit=crop&q=80&w=1000',
@@ -1658,7 +1719,26 @@ export default function App() {
           SAMPLE_PRODUCTS.forEach(p => setDoc(doc(db, 'products', p.id), p).catch(e => handleAppError(e)));
         }
       } else {
-        setProducts(snap.docs.map(d => ({ id: d.id, ...d.data() } as Product)));
+        const fetchedProducts = snap.docs.map(d => ({ id: d.id, ...d.data() } as Product));
+        
+        // Migration logic: Update names if they match old sample names
+        if (isAdmin(auth.currentUser)) {
+          const oldNames: Record<string, string> = {
+            '고성능 STEEL BAND OVEN': 'STEEL BAND OVEN',
+            '산업용 벨트컨베이어 시스템': '벨트컨베이어',
+            '정밀 샌딩머신': '샌딩머신',
+            '오일 및 소금 스프레이 시스템': '오일스프레이, 소금스프레이'
+          };
+          
+          fetchedProducts.forEach(p => {
+            if (p.name in oldNames) {
+              setDoc(doc(db, 'products', p.id), { ...p, name: oldNames[p.name] })
+                .catch(e => console.error('Migration error:', e));
+            }
+          });
+        }
+        
+        setProducts(fetchedProducts);
       }
       setLoading(false);
     }, (error) => handleAppError(error));
