@@ -194,9 +194,9 @@ const Navbar = ({ config, user }: { config: SiteConfig; user: User | null }) => 
 
   const navLinks = [
     { name: '홈', path: '/' },
-    { name: '회사소개', path: '/about' },
+    { name: '회사 소개', path: '/about' },
     { 
-      name: '제품소개', 
+      name: '제품 소개', 
       path: '/products',
       subLinks: [
         { name: 'STEEL BAND OVEN', path: '/products?category=STEEL BAND OVEN' },
@@ -205,8 +205,8 @@ const Navbar = ({ config, user }: { config: SiteConfig; user: User | null }) => 
         { name: '오일스프레이, 소금스프레이', path: '/products?category=오일스프레이, 소금스프레이' },
       ]
     },
-    { name: '고객지원', path: '/contact' },
-    { name: '관리자', path: '/admin' },
+    { name: '고객 지원', path: '/contact' },
+    ...(isAdmin(user) ? [{ name: '관리자', path: '/admin' }] : []),
   ];
 
   const [activeSubMenu, setActiveSubMenu] = useState<string | null>(null);
@@ -241,7 +241,7 @@ const Navbar = ({ config, user }: { config: SiteConfig; user: User | null }) => 
                   to={link.path}
                   className={cn(
                     "text-sm font-medium transition-colors hover:text-blue-900 flex items-center gap-1 py-8",
-                    location.pathname === link.path ? "text-blue-900" : (link.name === '관리자' ? "text-gray-400" : "text-gray-600")
+                    location.pathname === link.path ? "text-blue-900" : "text-gray-600"
                   )}
                 >
                   {link.name}
@@ -294,7 +294,7 @@ const Navbar = ({ config, user }: { config: SiteConfig; user: User | null }) => 
                       onClick={() => !link.subLinks && setIsOpen(false)}
                       className={cn(
                         "block px-3 py-4 text-base font-medium",
-                        location.pathname === link.path ? "text-blue-900" : (link.name === '관리자' ? "text-gray-400" : "text-gray-600")
+                        location.pathname === link.path ? "text-blue-900" : "text-gray-600"
                       )}
                     >
                       {link.name}
@@ -387,7 +387,7 @@ const Footer = ({ config }: { config: SiteConfig }) => (
           </ul>
         </div>
         <div>
-          <h4 className="text-white font-semibold mb-6">고객지원</h4>
+          <h4 className="text-white font-semibold mb-6">고객 지원</h4>
           <ul className="space-y-4">
             <li><Link to="/contact" className="hover:text-white transition-colors">견적 문의</Link></li>
             <li><Link to="/contact" className="hover:text-white transition-colors">A/S 신청</Link></li>
@@ -756,7 +756,7 @@ const ContactPage = ({ config }: { config: SiteConfig }) => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-20">
           <div>
-            <h1 className="text-4xl font-bold text-gray-900 mb-6">고객센터</h1>
+            <h1 className="text-4xl font-bold text-gray-900 mb-6">고객 센터</h1>
             <p className="text-lg text-gray-600 mb-12 leading-relaxed">
               제품에 대한 궁금한 점이나 견적 문의가 있으시면 언제든 연락주세요.<br />
               전문 상담원이 친절하게 안내해 드립니다.
@@ -777,7 +777,7 @@ const ContactPage = ({ config }: { config: SiteConfig }) => {
                   <Phone className="w-6 h-6 text-blue-900" />
                 </div>
                 <div>
-                  <h4 className="font-bold text-gray-900 mb-1">전화 번호</h4>
+                  <h4 className="font-bold text-gray-900 mb-1">전화번호</h4>
                   <p className="text-gray-600">{config.contactPhone}</p>
                 </div>
               </div>
