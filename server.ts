@@ -11,6 +11,19 @@ async function startServer() {
   const PORT = 3000;
 
   app.use(express.json());
+  
+  // API Route for Firebase Configuration
+  app.get("/api/firebase-config", (req, res) => {
+    res.json({
+      apiKey: process.env.VITE_FIREBASE_API_KEY || "AIzaSyC9D8YizmDQ3Yj2IxlHNSHXiklrgoNyWjg",
+      authDomain: process.env.VITE_FIREBASE_AUTH_DOMAIN || "gen-lang-client-0310179784.firebaseapp.com",
+      projectId: process.env.VITE_FIREBASE_PROJECT_ID || "gen-lang-client-0310179784",
+      storageBucket: process.env.VITE_FIREBASE_STORAGE_BUCKET || "gen-lang-client-0310179784.firebasestorage.app",
+      messagingSenderId: process.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "825951925269",
+      appId: process.env.VITE_FIREBASE_APP_ID || "1:825951925269:web:9ef28da5e1d78fe1148a1c",
+      firestoreDatabaseId: process.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID || "ai-studio-0eef5eab-c126-461c-b357-7e29b581fad8"
+    });
+  });
 
   // API Route for Contact Form (Email Sending)
   app.post("/api/contact", async (req, res) => {
