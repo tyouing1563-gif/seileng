@@ -901,7 +901,7 @@ const AdminDashboard = ({ config, products, user }: { config: SiteConfig; produc
           {user && !isAdmin(user) && (
             <div className="mb-8 p-4 bg-red-50 border border-red-100 rounded-2xl text-red-600 text-sm font-medium">
               <p className="mb-1">권한이 없는 계정입니다:</p>
-              <p className="font-bold break-all">{user.email}</p>
+              <p className="font-bold break-all">{(user as any).email}</p>
               <p className="mt-2 text-xs opacity-70">관리자 계정(tyouing1563@gmail.com)으로 다시 로그인해 주세요.</p>
               <button 
                 onClick={() => signOut(auth)}
