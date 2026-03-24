@@ -155,7 +155,7 @@ const Lightbox = ({ imageUrl, onClose }: { imageUrl: string | null; onClose: () 
   );
 };
 
-const isAdmin = (user: User | null) => {
+const isAdmin = (user: User | null): user is User => {
   if (!user?.email) return false;
   return user.email.toLowerCase().trim() === "tyouing1563@gmail.com";
 };
