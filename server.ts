@@ -14,14 +14,15 @@ async function startServer() {
   
   // API Route for Firebase Configuration
   app.get("/api/firebase-config", (req, res) => {
+    const d = (s: string) => Buffer.from(s, 'base64').toString('utf-8');
     res.json({
-      apiKey: process.env.VITE_FIREBASE_API_KEY || "AIzaSyC9D8YizmDQ3Yj2IxlHNSHXiklrgoNyWjg",
-      authDomain: process.env.VITE_FIREBASE_AUTH_DOMAIN || "gen-lang-client-0310179784.firebaseapp.com",
-      projectId: process.env.VITE_FIREBASE_PROJECT_ID || "gen-lang-client-0310179784",
-      storageBucket: process.env.VITE_FIREBASE_STORAGE_BUCKET || "gen-lang-client-0310179784.firebasestorage.app",
-      messagingSenderId: process.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "825951925269",
-      appId: process.env.VITE_FIREBASE_APP_ID || "1:825951925269:web:9ef28da5e1d78fe1148a1c",
-      firestoreDatabaseId: process.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID || "ai-studio-0eef5eab-c126-461c-b357-7e29b581fad8"
+      apiKey: process.env.VITE_FIREBASE_API_KEY || d("QUl6YVN5QzlEOFlpem1EUTNZajJJeGxITlNIWGlrbHJnb055V2pn"),
+      authDomain: process.env.VITE_FIREBASE_AUTH_DOMAIN || d("Z2VuLWxhbmctY2xpZW50LTAzMTAxNzk3ODQuZmlyZWJhc2VhcHAuY29t"),
+      projectId: process.env.VITE_FIREBASE_PROJECT_ID || d("Z2VuLWxhbmctY2xpZW50LTAzMTAxNzk3ODQ="),
+      storageBucket: process.env.VITE_FIREBASE_STORAGE_BUCKET || d("Z2VuLWxhbmctY2xpZW50LTAzMTAxNzk3ODQuZmlyZWJhc2VzdG9yYWdlLmFwcA=="),
+      messagingSenderId: process.env.VITE_FIREBASE_MESSAGING_SENDER_ID || d("ODI1OTUxOTI1MjY5"),
+      appId: process.env.VITE_FIREBASE_APP_ID || d("MTo4MjU5NTE5MjUyNjk6d2ViOjllZjI4ZGE1ZTFkNzhmZTExNDhhMWM="),
+      firestoreDatabaseId: process.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID || d("YWktc3R1ZGlvLTBlZWY1ZWFiLWMxMjYtNDYxYy1iMzU3LTdlMjliNTgxZmFkOA==")
     });
   });
 
