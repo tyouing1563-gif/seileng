@@ -4,7 +4,7 @@ import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut, User 
 import { doc, onSnapshot, collection, query, orderBy, getDoc, setDoc, getDocFromServer, deleteDoc } from 'firebase/firestore';
 import { auth, db } from './firebase';
 import { SiteConfig, Product, UserProfile, Inquiry } from './types';
-import { Menu, X, Settings, LogOut, Phone, Mail, MapPin, ChevronRight, ChevronDown, Factory, Utensils, ShieldCheck, Clock, AlertCircle, Quote, Camera, Upload, Image as ImageIcon, Loader2, Plus } from 'lucide-react';
+import { Menu, X, Settings, LogOut, Phone, Mail, MapPin, ChevronRight, ChevronDown, Factory, Utensils, ShieldCheck, Clock, AlertCircle, Quote, Camera, Upload, Image as ImageIcon, Loader2, Plus, Globe } from 'lucide-react';
 import { motion, AnimatePresence, useScroll, useTransform } from 'motion/react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -1022,6 +1022,21 @@ const AdminDashboard = ({ config, products, user }: { config: SiteConfig; produc
           </div>
 
           <div className="bg-white rounded-[2.5rem] p-10 shadow-sm border border-gray-100">
+            {activeTab === 'config' && (
+              <div className="bg-blue-50 p-6 rounded-3xl border border-blue-100 mb-8">
+                <h3 className="text-lg font-bold text-blue-900 mb-2 flex items-center gap-2">
+                  <Globe className="w-5 h-5" /> Netlify 배포 동기화 가이드
+                </h3>
+                <p className="text-sm text-blue-800 mb-4">
+                  AI Studio에서 수정한 내용이 Netlify에 즉시 반영되도록 하려면 다음 설정을 확인하세요:
+                </p>
+                <ul className="text-xs text-blue-700 space-y-2 list-disc pl-5">
+                  <li><strong>Firebase 설정:</strong> Netlify의 환경 변수(Environment Variables)에 <code>VITE_FIREBASE_*</code> 값들이 정확히 입력되어 있어야 합니다.</li>
+                  <li><strong>도메인 승인:</strong> Firebase 콘솔 &gt; Authentication &gt; Settings &gt; Authorized domains에 Netlify 주소를 추가해야 로그인이 가능합니다.</li>
+                  <li><strong>실시간 업데이트:</strong> AI Studio에서 제품을 추가/삭제하면 Netlify 사이트에서도 새로고침 없이 실시간으로 업데이트됩니다.</li>
+                </ul>
+              </div>
+            )}
             <ErrorBoundary>
               {activeTab === 'config' && <ConfigEditor config={config} />}
               {activeTab === 'products' && <ProductManager products={products} />}
@@ -1684,8 +1699,12 @@ export default function App() {
 
   const handleAppError = useCallback((error: any) => {
     console.error("[App Error]", error);
-    setGlobalError(error instanceof Error ? error.message : String(error));
-    setLoading(false); // Ensure we don't get stuck on loading screen
+    if (error?.code === 'auth/unauthorized-domain') {
+      setGlobalError("Firebase 인증 오류: 현재 도메인이 Firebase 콘솔의 '승인된 도메인'에 등록되지 않았습니다. Firebase 콘솔에서 Netlify 주소를 추가해주세요.");
+    } else {
+      setGlobalError(error instanceof Error ? error.message : String(error));
+    }
+    setLoading(false);
   }, []);
 
   useEffect(() => {
@@ -1717,10 +1736,14 @@ export default function App() {
 
     // Listen for products
     const unsubProducts = onSnapshot(collection(db, 'products'), (snap) => {
+      console.log(`[Firestore] Products fetched: ${snap.size} items`);
       const fetchedProducts = snap.docs.map(d => ({ id: d.id, ...d.data() } as Product));
       setProducts(fetchedProducts);
       setLoading(false);
-    }, (error) => handleAppError(error));
+    }, (error) => {
+      console.error("[Firestore Error] Products:", error);
+      handleAppError(error);
+    });
 
     return () => {
       unsubAuth();

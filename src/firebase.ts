@@ -14,6 +14,12 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID || d("MTo4MjU5NTE5MjUyNjk6d2ViOjllZjI4ZGE1ZTFkNzhmZTExNDhhMWM="),
 };
 
+if (!import.meta.env.VITE_FIREBASE_API_KEY) {
+  console.warn("[Firebase] Using hardcoded fallback configuration. Please set VITE_FIREBASE_* environment variables in your deployment.");
+} else {
+  console.log("[Firebase] Using environment variable configuration.");
+}
+
 const firestoreDatabaseId = import.meta.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID || d("YWktc3R1ZGlvLTBlZWY1ZWFiLWMxMjYtNDYxYy1iMzU3LTdlMjliNTgxZmFkOA==");
 
 const app = initializeApp(firebaseConfig);
