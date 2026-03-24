@@ -157,7 +157,10 @@ const Lightbox = ({ imageUrl, onClose }: { imageUrl: string | null; onClose: () 
 
 const isAdmin = (user: User | null): user is User => {
   if (!user?.email) return false;
-  return user.email.toLowerCase().trim() === "tyouing1563@gmail.com";
+  const adminEmail = "tyouing1563@gmail.com";
+  const isMatch = user.email.toLowerCase().trim() === adminEmail;
+  console.log(`[Admin Check] User: ${user.email}, Match: ${isMatch}`);
+  return isMatch;
 };
 
 const ErrorDisplay = ({ errorInfo, onReset }: { errorInfo: string; onReset: () => void }) => {
@@ -1012,7 +1015,10 @@ const AdminDashboard = ({ config, products, user }: { config: SiteConfig; produc
               {activeTab === 'products' && '제품 관리'}
               {activeTab === 'inquiries' && '문의 내역'}
             </h2>
-            <p className="text-gray-500">웹사이트의 {activeTab === 'config' ? '기본 정보와 디자인' : activeTab === 'products' ? '제품 라인업' : '고객 문의'}을 관리합니다.</p>
+            <p className="text-gray-500">
+              웹사이트의 {activeTab === 'config' ? '기본 정보와 디자인' : activeTab === 'products' ? '제품 라인업' : '고객 문의'}을 관리합니다.
+              {isAdmin(user) && <span className="ml-2 text-[10px] text-blue-400 font-bold uppercase tracking-widest">(Admin Verified)</span>}
+            </p>
           </div>
 
           <div className="bg-white rounded-[2.5rem] p-10 shadow-sm border border-gray-100">
@@ -1677,7 +1683,9 @@ export default function App() {
   const [globalError, setGlobalError] = useState<string | null>(null);
 
   const handleAppError = useCallback((error: any) => {
+    console.error("[App Error]", error);
     setGlobalError(error instanceof Error ? error.message : String(error));
+    setLoading(false); // Ensure we don't get stuck on loading screen
   }, []);
 
   useEffect(() => {
@@ -1696,6 +1704,7 @@ export default function App() {
   useEffect(() => {
     // Listen for auth changes
     const unsubAuth = onAuthStateChanged(auth, (u) => {
+      console.log("[Auth State Changed]", u?.email);
       setUser(u);
     });
 
@@ -1703,43 +1712,13 @@ export default function App() {
     const unsubConfig = onSnapshot(doc(db, 'config', 'main'), (snap) => {
       if (snap.exists()) {
         setConfig(snap.data() as SiteConfig);
-      } else {
-        // Only admin can initialize
-        if (isAdmin(auth.currentUser)) {
-          setDoc(doc(db, 'config', 'main'), DEFAULT_CONFIG).catch(e => handleAppError(e));
-        }
       }
     }, (error) => handleAppError(error));
 
     // Listen for products
     const unsubProducts = onSnapshot(collection(db, 'products'), (snap) => {
-      if (snap.empty) {
-        // Only admin can seed
-        if (isAdmin(auth.currentUser)) {
-          SAMPLE_PRODUCTS.forEach(p => setDoc(doc(db, 'products', p.id), p).catch(e => handleAppError(e)));
-        }
-      } else {
-        const fetchedProducts = snap.docs.map(d => ({ id: d.id, ...d.data() } as Product));
-        
-        // Migration logic: Update names if they match old sample names
-        if (isAdmin(auth.currentUser)) {
-          const oldNames: Record<string, string> = {
-            '고성능 STEEL BAND OVEN': 'STEEL BAND OVEN',
-            '산업용 벨트컨베이어 시스템': '벨트컨베이어',
-            '정밀 샌딩머신': '샌딩머신',
-            '오일 및 소금 스프레이 시스템': '오일스프레이, 소금스프레이'
-          };
-          
-          fetchedProducts.forEach(p => {
-            if (p.name in oldNames) {
-              setDoc(doc(db, 'products', p.id), { ...p, name: oldNames[p.name] })
-                .catch(e => console.error('Migration error:', e));
-            }
-          });
-        }
-        
-        setProducts(fetchedProducts);
-      }
+      const fetchedProducts = snap.docs.map(d => ({ id: d.id, ...d.data() } as Product));
+      setProducts(fetchedProducts);
       setLoading(false);
     }, (error) => handleAppError(error));
 
@@ -1749,6 +1728,25 @@ export default function App() {
       unsubProducts();
     };
   }, [handleAppError]);
+
+  // Separate effect for seeding to ensure it runs when user logs in
+  useEffect(() => {
+    if (user && isAdmin(user) && products.length === 0 && !loading) {
+      console.log("[Seeding] Database is empty and user is admin. Seeding...");
+      
+      // Seed Config
+      getDoc(doc(db, 'config', 'main')).then(snap => {
+        if (!snap.exists()) {
+          setDoc(doc(db, 'config', 'main'), DEFAULT_CONFIG).catch(e => handleAppError(e));
+        }
+      });
+
+      // Seed Products
+      SAMPLE_PRODUCTS.forEach(p => {
+        setDoc(doc(db, 'products', p.id), p).catch(e => handleAppError(e));
+      });
+    }
+  }, [user, products.length, loading, handleAppError]);
 
   if (globalError) {
     return <ErrorDisplay errorInfo={globalError} onReset={() => window.location.reload()} />;
